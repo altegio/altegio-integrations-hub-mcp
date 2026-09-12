@@ -204,7 +204,7 @@ Employee payload: ID and name parts. Client adds phone, birthdate, sex, comer. V
 
 ## Chat and sidebar frames
 
-For a normal new application, pass `chat_url` in the activation callback. `NotificationInstaller` creates/updates the chat frame directly and bypasses the general frame installer allowlist. The effective base URL contains `salon_id` and legacy `hash`; timetable use adds `user_id` and `lang_id`, and appointment context adds client `phone`.
+For a normal new application, pass `chat_url` in the activation callback. `NotificationInstaller` creates/updates the chat frame directly rather than using the general frame installer. The effective base URL contains `salon_id` and legacy `hash`; timetable use adds `user_id` and `lang_id`, and appointment context adds client `phone`.
 
 Chat visibility requires `hasChatAccess`: explicit backoffice access or the relevant timetable phone + appointment client permissions. `POST /marketplace/application/new_message` sets unread/highlight state, publishes a socket update, and may add notification-center entries. If the location enables lead saving, a message from an unknown phone may create a lead. Location users control push and lead-saving settings.
 
@@ -277,7 +277,7 @@ Developer frame declaration save does not invalidate or rewrite already material
 ## Rollout gates and known limitations
 
 - Entity frames require the backend/frontend rollout release; declarations saved before it remain inert until a new installation.
-- Waiting list/task tracker: YCLIENTS-only frontend plus application allowlist.
+- Waiting list/task tracker require the frontend rollout release that removes the historical brand gate; they remain internal sidebar types.
 - Chat: usable through activation callback, but one shared slot per location.
 - Arbitrary iframe types or main-menu items: no configuration extension point found.
 - Schedule webhook: setting is not propagated into actual webhook DTO.
