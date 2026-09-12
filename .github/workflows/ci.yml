@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22.23.2'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: docker build -t altegio-marketplace-mcp:ci .
+      - name: Container smoke
+        run: |
+          docker run -d --rm --name marketplace-mcp -p 8094:8094 -e ALTEGIO_PARTNER_TOKEN=test altegio-marketplace-mcp:ci
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8094/health && exit 0; sleep 1; done
+          docker logs marketplace-mcp
+          exit 1
