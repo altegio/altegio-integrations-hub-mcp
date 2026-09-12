@@ -108,6 +108,7 @@ Public dictionaries:
 GET /api/v1/marketplace/applications/categories
 GET /api/v1/marketplace/applications/channels
 GET /api/v1/marketplace/applications/functionalities
+GET /api/v1/countries
 ```
 
 Categories `analytics` and `ai_bots` exist. Category selection affects discovery only; it does not grant permissions or UI placement.

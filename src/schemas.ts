@@ -11,25 +11,32 @@ export const httpsUrl = z
     message: 'HTTPS URL required',
   });
 
+const baseAccount = {
+  title: z.string().min(1),
+  description: z.string().min(1),
+  name: z.string().min(1),
+  phone: z.string().min(5),
+  email: z.string().email(),
+  website_url: httpsUrl,
+  legal_type: z.enum(['llc', 'cjsc', 'jsc', 'ie', 'np', 'le']).default('llc'),
+};
+
+export const createAccountPayload = z
+  .object({
+    ...baseAccount,
+    partner_token: z.string().min(1).optional(),
+  })
+  .strict();
+
 export const accountPayload = z
   .object({
-    title: z.string().min(1),
-    description: z.string().min(1),
-    name: z.string().min(1),
-    phone: z.string().min(5),
-    email: z.string().email(),
-    website_url: httpsUrl,
-    legal_type: z.enum(['llc', 'cjsc', 'jsc', 'ie', 'np', 'le']).default('llc'),
+    ...baseAccount,
     country_id: positiveId.optional(),
     company_name: z.string().min(1).optional(),
     reg_number: z.string().min(1).optional(),
     privacy_policy_url: httpsUrl.optional(),
   })
   .strict();
-
-export const createAccountPayload = accountPayload.extend({
-  partner_token: z.string().min(1).optional(),
-});
 
 const baseApplication = {
   title: z.string().min(3),

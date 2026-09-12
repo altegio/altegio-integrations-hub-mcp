@@ -43,6 +43,22 @@ describe('tool contracts', () => {
     expect(result).toMatchObject({ applied: false });
   });
 
+  test('catalog metadata includes the country dictionary', async () => {
+    const client = new FakeClient();
+    const target = buildTools(testConfig, client).find(
+      (item) => item.name === 'marketplace_get_catalog_metadata'
+    )!;
+    await target.handler({});
+    expect(client.calls.map((call) => call.path)).toEqual(
+      expect.arrayContaining([
+        '/marketplace/applications/categories',
+        '/countries',
+        '/marketplace/applications/channels',
+        '/marketplace/applications/functionalities',
+      ])
+    );
+  });
+
   test('create application is idempotent by slug', async () => {
     const client = new FakeClient();
     const target = buildTools(testConfig, client).find(
@@ -86,6 +102,7 @@ describe('tool contracts', () => {
       application_id: 7,
       location_id: 55,
       settings: { webhook_urls: ['https://example.com/hook'], channels: [] },
+      confirmation: 'ACTIVATE APPLICATION 7 AT LOCATION 55',
     });
     const write = client.calls.find((call) => call.path === '/marketplace/partner/callback');
     expect(write?.options.body).toMatchObject({ salon_id: 55, application_id: 7 });

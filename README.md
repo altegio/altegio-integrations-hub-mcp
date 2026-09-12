@@ -34,7 +34,7 @@ Prompt: `marketplace_safe_draft_rollout`.
 
 Every mutation requires `mode: plan | apply`. Plan mode sends no write request. Destructive and production-sensitive operations require an exact confirmation phrase. Payment records have a durable local idempotency store; application creation uses slug as a natural idempotency key; activation status-checks before callback.
 
-Partner operations are not authorized merely because a caller reached the public MCP endpoint. The server first checks that the caller's Altegio user can see the requested application in the stated developer account, then uses that account's `partner_system.token`. Transport authentication tokens are never accepted as tool arguments. The optional `account.partner_token` on account creation only binds a developer account to an existing partner system and is treated as a secret. Tokens, API keys, passwords, authorization headers, and secret keys are recursively redacted from tool results; secret-bearing settings are forwarded without logging.
+Partner operations are not authorized merely because a caller reached the public MCP endpoint. The server first checks that the caller's Altegio user can see the requested application in the stated developer account, then uses that account's `partner_system.token`. Transport authentication headers are never accepted as tool arguments. The optional `account.partner_token` on account creation only binds an existing partner system; `payload.partner_token` is accepted only by the callback-validation helper. Both are treated as secrets. Tokens, API keys, passwords, authorization headers, and secret keys are recursively redacted from tool results; secret-bearing settings are forwarded without logging.
 
 Backoffice tools require both:
 

@@ -196,16 +196,17 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
     ),
     tool(
       'marketplace_get_catalog_metadata',
-      'Get current Marketplace categories, channels, and functionalities from Biz.ERP. Country IDs remain application/account fields; there is no Marketplace-specific country dictionary endpoint.',
+      'Get current Marketplace categories, channels, functionalities, and the general country dictionary used by application/account country IDs.',
       z.object({}).strict(),
       { readOnly: true },
       async () => {
-        const [categories, channels, functionalities] = await Promise.all([
+        const [categories, countries, channels, functionalities] = await Promise.all([
           client.request('/marketplace/applications/categories', { lane: 'public' }),
+          client.request('/countries', { lane: 'public' }),
           client.request('/marketplace/applications/channels', { lane: 'public' }),
           client.request('/marketplace/applications/functionalities', { lane: 'public' }),
         ]);
-        return { categories, channels, functionalities };
+        return { categories, countries, channels, functionalities };
       }
     ),
     tool(
@@ -248,13 +249,28 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
     ),
     tool(
       'marketplace_update_application',
-      'Plan or update the complete Marketplace card and technical settings: descriptions, media, countries, permissions, callbacks, iframe, multi-location, privacy, channels, and monetization.',
-      z.object({ ...mutation, ...partnerAndApp, application: updateApplicationPayload }).strict(),
-      {},
-      async ({ mode: applyMode, partner_id, application_id, application }) => {
+      'Plan or replace the complete Marketplace card and technical settings. Apply requires exact confirmation because omitted collections are cleared.',
+      z
+        .object({
+          ...mutation,
+          ...partnerAndApp,
+          application: updateApplicationPayload,
+          confirmation: z.string().optional(),
+        })
+        .strict(),
+      { destructive: true },
+      async ({ mode: applyMode, partner_id, application_id, application, confirmation }) => {
         await owned(partner_id, application_id);
         const path = `/marketplace/developers/companies/${partner_id}/applications/${application_id}`;
-        if (applyMode === 'plan') return pathPlan('update_application', 'PUT', path, application);
+        if (applyMode === 'plan')
+          return pathPlan(
+            'update_application',
+            'PUT',
+            path,
+            application,
+            `Full replacement. Apply requires: UPDATE APPLICATION ${application_id}`
+          );
+        requireConfirmation(confirmation, `UPDATE APPLICATION ${application_id}`);
         return bodyResult(
           'update_application',
           await client.request(path, { method: 'PUT', lane: 'user', body: application })
@@ -363,13 +379,31 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
     ),
     tool(
       'marketplace_grant_location_access',
-      'Plan or perform step 1 of installation: location owner grants access, producing pending (or immediate active for eligible draft/private apps).',
-      z.object({ ...mutation, ...partnerAndApp, location_id: positiveId }).strict(),
+      'Plan or perform step 1 of installation: location owner grants access, producing pending (or immediate active for eligible draft/private apps). Apply requires exact confirmation.',
+      z
+        .object({
+          ...mutation,
+          ...partnerAndApp,
+          location_id: positiveId,
+          confirmation: z.string().optional(),
+        })
+        .strict(),
       {},
-      async ({ mode: applyMode, partner_id, application_id, location_id }) => {
+      async ({ mode: applyMode, partner_id, application_id, location_id, confirmation }) => {
         await owned(partner_id, application_id);
         const path = `/company/${location_id}/marketplace/applications/${application_id}/grant_access`;
-        if (applyMode === 'plan') return pathPlan('grant_location_access', 'POST', path);
+        if (applyMode === 'plan')
+          return pathPlan(
+            'grant_location_access',
+            'POST',
+            path,
+            undefined,
+            `May activate eligible private apps immediately. Apply requires: GRANT APPLICATION ${application_id} ACCESS TO LOCATION ${location_id}`
+          );
+        requireConfirmation(
+          confirmation,
+          `GRANT APPLICATION ${application_id} ACCESS TO LOCATION ${location_id}`
+        );
         return bodyResult(
           'grant_location_access',
           await client.request(path, { method: 'POST', lane: 'user' })
@@ -385,13 +419,32 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
           ...partnerAndApp,
           location_id: positiveId,
           settings: installationSettings,
+          confirmation: z.string().optional(),
         })
         .strict(),
       {},
-      async ({ mode: applyMode, partner_id, application_id, location_id, settings }) => {
+      async ({
+        mode: applyMode,
+        partner_id,
+        application_id,
+        location_id,
+        settings,
+        confirmation,
+      }) => {
         const path = '/marketplace/partner/callback';
         const body = { salon_id: location_id, application_id, ...settings };
-        if (applyMode === 'plan') return pathPlan('activate_installation', 'POST', path, body);
+        if (applyMode === 'plan')
+          return pathPlan(
+            'activate_installation',
+            'POST',
+            path,
+            body,
+            `Apply requires: ACTIVATE APPLICATION ${application_id} AT LOCATION ${location_id}`
+          );
+        requireConfirmation(
+          confirmation,
+          `ACTIVATE APPLICATION ${application_id} AT LOCATION ${location_id}`
+        );
         const status = await partnerRead(
           partner_id,
           application_id,
