@@ -74,6 +74,33 @@ function paymentSignature(
   return createHmac('sha256', token).update(parts.join('&')).digest('hex');
 }
 
+const entityFrames = z
+  .array(
+    z
+      .object({
+        title: z.string().min(3).max(100),
+        url: httpsUrl.describe(
+          'HTTPS iframe URL. Redirects must preserve this URL origin or postMessage will fail.'
+        ),
+        slug: z.enum(['employee', 'client', 'visit']),
+      })
+      .strict()
+  )
+  .max(3)
+  .superRefine((frames, context) => {
+    const seen = new Set<string>();
+    frames.forEach((frame, index) => {
+      if (seen.has(frame.slug)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Only one ${frame.slug} declaration is allowed per application.`,
+          path: [index, 'slug'],
+        });
+      }
+      seen.add(frame.slug);
+    });
+  });
+
 export function buildTools(config: Config, client = new MarketplaceClient(config)): ToolSpec[] {
   const idempotency = new IdempotencyStore(config.MARKETPLACE_MCP_STATE_DIR);
   const owned = (partnerId: number, applicationId: number): Promise<void> =>
@@ -325,7 +352,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
     ),
     tool(
       'marketplace_list_entity_frames',
-      'List declared employee/client/visit iframe definitions. Runtime use is currently gated in Biz.ERP.',
+      'List declared employee/client/visit iframe definitions. Declarations are copied to a location only during a later application installation.',
       z.object(partnerAndApp).strict(),
       { readOnly: true },
       async ({ partner_id, application_id }) => {
@@ -338,22 +365,12 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
     ),
     tool(
       'marketplace_replace_entity_frames',
-      'Plan or replace the full employee/client/visit frame declaration set. Omitted frames are deleted; runtime exposure remains feature-gated.',
+      'Plan or replace the full employee/client/visit declaration set. Omitted slugs are deleted. Existing installations are not updated or backfilled.',
       z
         .object({
           ...mutation,
           ...partnerAndApp,
-          frames: z
-            .array(
-              z
-                .object({
-                  title: z.string().min(3).max(100),
-                  url: httpsUrl,
-                  slug: z.enum(['employee', 'client', 'visit']),
-                })
-                .strict()
-            )
-            .max(7),
+          frames: entityFrames,
           confirmation: z.string().optional(),
         })
         .strict(),
@@ -368,13 +385,23 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
             'POST',
             path,
             body,
-            'Full replacement; omitted declarations are deleted.'
+            'Full replacement: omitted declarations are deleted. Empty frames deletes all declarations. Existing installations are unchanged. Redirects must stay on each declared iframe origin.'
           );
         requireConfirmation(confirmation, `REPLACE FRAMES FOR APPLICATION ${application_id}`);
-        return bodyResult(
-          'replace_entity_frames',
-          await client.request(path, { method: 'POST', lane: 'user', body })
-        );
+        const write = await client.request(path, { method: 'POST', lane: 'user', body });
+        const declaredFrames = await client.request(path, { lane: 'user' }).catch(() => undefined);
+        return {
+          ok: true,
+          applied: true,
+          operation: 'replace_entity_frames',
+          data: write,
+          verification: {
+            declarations_read_back_succeeded: declaredFrames !== undefined,
+            declarations_read_back: declaredFrames,
+            existing_installations_updated: false,
+            note: 'The Developer Frames API exposes declarations, not effective per-location frames.',
+          },
+        };
       }
     ),
     tool(
@@ -404,10 +431,23 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
           confirmation,
           `GRANT APPLICATION ${application_id} ACCESS TO LOCATION ${location_id}`
         );
-        return bodyResult(
-          'grant_location_access',
-          await client.request(path, { method: 'POST', lane: 'user' })
-        );
+        const write = await client.request(path, { method: 'POST', lane: 'user' });
+        const status = await partnerRead(
+          partner_id,
+          application_id,
+          `/marketplace/salon/${location_id}/application/${application_id}`
+        ).catch(() => undefined);
+        return {
+          ok: true,
+          applied: true,
+          operation: 'grant_location_access',
+          data: write,
+          verification: {
+            installation_status_read_back: status,
+            effective_entity_frames_verified: false,
+            note: 'An active installation does not prove that entity frames were created when the location-wide frame limit is exhausted.',
+          },
+        };
       }
     ),
     tool(
@@ -458,10 +498,23 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
             operation: 'activate_installation',
             data: status,
           };
-        return bodyResult(
-          'activate_installation',
-          await partnerWrite(partner_id, application_id, path, body)
-        );
+        const write = await partnerWrite(partner_id, application_id, path, body);
+        const verifiedStatus = await partnerRead(
+          partner_id,
+          application_id,
+          `/marketplace/salon/${location_id}/application/${application_id}`
+        ).catch(() => undefined);
+        return {
+          ok: true,
+          applied: true,
+          operation: 'activate_installation',
+          data: write,
+          verification: {
+            installation_status_read_back: verifiedStatus,
+            effective_entity_frames_verified: false,
+            note: 'Frame limits are location-wide: employee 1, client 1, visit 5 across all applications. The current partner API does not expose effective entity frames.',
+          },
+        };
       }
     ),
     tool(
@@ -558,7 +611,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
     ),
     tool(
       'marketplace_install_sidebar_frame',
-      'Attempt an allowlisted sidebar frame installation. Chat is normally configured through activation; waiting_list/task_tracker are product-gated.',
+      'Install or remove an internal chat/waiting_list/task_tracker sidebar frame. These types are distinct from developer employee/client/visit frames.',
       z
         .object({
           ...mutation,
@@ -587,16 +640,30 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
             'POST',
             path,
             body,
-            'The API enforces application allowlists and brand/runtime gates.'
+            'Internal sidebar operation; do not use this tool for employee/client/visit developer frames. A success response does not guarantee creation when a location-wide limit is exhausted.'
           );
         requireConfirmation(
           confirmation,
           `INSTALL ${type} FRAME FOR APPLICATION ${application_id} AT LOCATION ${location_id}`
         );
-        return bodyResult(
-          'install_sidebar_frame',
-          await partnerWrite(partner_id, application_id, path, body)
-        );
+        const write = await partnerWrite(partner_id, application_id, path, body);
+        const status = await partnerRead(
+          partner_id,
+          application_id,
+          `/marketplace/salon/${location_id}/application/${application_id}`
+        ).catch(() => undefined);
+        return {
+          ok: true,
+          applied: true,
+          operation: 'install_sidebar_frame',
+          data: write,
+          verification: {
+            installation_status_read_back: status,
+            effective_sidebar_frame_verified: false,
+            outcome: 'unverified',
+            note: 'The partner API has no read endpoint for effective sidebar frames; upstream may return success without creating one at the limit.',
+          },
+        };
       }
     ),
     tool(

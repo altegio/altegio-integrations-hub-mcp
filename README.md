@@ -86,8 +86,9 @@ Live mutation tests are intentionally not part of CI because they would create M
 ## Known platform limits
 
 - Normal partner API has no direct freeze/unfreeze command. Expiry freezes; a valid payment may unfreeze.
-- Entity frames are stored but blocked for normal new apps by a frontend feature constant and application/location allowlists.
-- Waiting-list/task-tracker sidebar frames are additionally brand-gated; general frame installation is allowlisted.
+- Entity-frame rollout requires the Biz.ERP backend/frontend release that removes the historical application/location and frontend gates. Saving declarations never backfills existing installations.
+- Entity frame URLs are origin-bound: redirects to a different origin break `postMessage`. Per-location limits are global across applications: employee 1, client 1, visit 5.
+- Developer entity frames (`employee/client/visit`) and internal sidebar frames (`chat/waiting_list/task_tracker`) are separate systems.
 - Chat through activation is usable but one effective chat slot exists per location.
 - Schedule webhook configuration is not propagated into the installed webhook DTO.
 - Lifecycle callback URLs must target the application's backend, not this OAuth-protected MCP endpoint.

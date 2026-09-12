@@ -109,6 +109,76 @@ describe('tool contracts', () => {
     expect(write?.options.partnerToken).toBe('owned-partner-token');
   });
 
+  test('entity frame replacement rejects duplicate slugs', async () => {
+    const target = buildTools(testConfig, new FakeClient()).find(
+      (item) => item.name === 'marketplace_replace_entity_frames'
+    )!;
+    await expect(
+      target.handler({
+        mode: 'plan',
+        partner_id: 3,
+        application_id: 7,
+        frames: [
+          { title: 'Visit one', url: 'https://example.com/one', slug: 'visit' },
+          { title: 'Visit two', url: 'https://example.com/two', slug: 'visit' },
+        ],
+      })
+    ).rejects.toThrow('Only one visit declaration');
+  });
+
+  test('entity frame replacement reads declarations back after applying', async () => {
+    const client = new FakeClient();
+    const path = '/marketplace/developers/companies/3/applications/7/frames';
+    client.responses.set(path, {
+      success: true,
+      data: [{ title: 'Employee', url: 'https://example.com/frame', slug: 'employee' }],
+    });
+    const target = buildTools(testConfig, client).find(
+      (item) => item.name === 'marketplace_replace_entity_frames'
+    )!;
+    const result = await target.handler({
+      mode: 'apply',
+      partner_id: 3,
+      application_id: 7,
+      frames: [{ title: 'Employee', url: 'https://example.com/frame', slug: 'employee' }],
+      confirmation: 'REPLACE FRAMES FOR APPLICATION 7',
+    });
+
+    expect(client.calls.filter((call) => call.path === path)).toHaveLength(2);
+    expect(result).toMatchObject({
+      verification: {
+        declarations_read_back: { success: true },
+        existing_installations_updated: false,
+      },
+    });
+  });
+
+  test('sidebar frame installation reports its effective result as unverified', async () => {
+    const client = new FakeClient();
+    const target = buildTools(testConfig, client).find(
+      (item) => item.name === 'marketplace_install_sidebar_frame'
+    )!;
+    const result = await target.handler({
+      mode: 'apply',
+      partner_id: 3,
+      application_id: 7,
+      location_id: 55,
+      type: 'chat',
+      url: 'https://example.com/chat',
+      confirmation: 'INSTALL chat FRAME FOR APPLICATION 7 AT LOCATION 55',
+    });
+
+    expect(client.calls.map((call) => call.path)).toEqual(
+      expect.arrayContaining([
+        '/marketplace/application/install_frame',
+        '/marketplace/salon/55/application/7',
+      ])
+    );
+    expect(result).toMatchObject({
+      verification: { effective_sidebar_frame_verified: false, outcome: 'unverified' },
+    });
+  });
+
   test('payment-link request includes the required tariff option', async () => {
     const client = new FakeClient();
     const target = buildTools(testConfig, client).find(

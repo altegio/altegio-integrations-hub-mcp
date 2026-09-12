@@ -171,7 +171,7 @@ Biz.ERP to application:
 {action: 'send_iframe_offset', payload: {top, left, right, bottom, width, height, x, y, windowHeight}}
 ```
 
-The current generic channel sends with `targetOrigin='*'` and checks `event.source`, not `event.origin`. The embedded application must validate origin and message shape. Sources: `vue-app/src/util/iframeChannelBase/index.ts`, `MarketplaceSettingsTabIframeChannel.ts`, `MarketplaceProductDefaultSettingsTab.vue`.
+The generic Settings channel sends with `targetOrigin='*'` and checks `event.source`, not `event.origin`. This is separate from entity frames, whose channel is origin-bound. The embedded application must validate origin and message shape. Sources: `vue-app/src/util/iframeChannelBase/index.ts`, `MarketplaceSettingsTabIframeChannel.ts`, `MarketplaceProductDefaultSettingsTab.vue`.
 
 ## Entity frames
 
@@ -188,7 +188,7 @@ POST /api/v1/marketplace/developers/companies/{partnerId}/applications/{applicat
 
 Allowed slugs are `employee`, `client`, `visit`; title length 3–100; URL must be valid. Per location across all applications: employee 1, client 1, visit 5.
 
-Runtime is blocked for a normal new application by two independent gates: `isMarketplaceFrameSettingsFeatureEnabled = false` in `vue-app/src/util/frameSettings.ts`, and `MarketplaceFramesService::isAppFrameValidated()` allows only application IDs 186, 121, 39 except eight hardcoded test locations. Saving declarations does not make them visible.
+The rollout release removes the historical frontend feature constant and application/test-location allowlists. It does not add backfill: saving declarations does not update already installed applications. New values are copied only during a later installation.
 
 Protocol after gates are enabled:
 
@@ -200,7 +200,7 @@ Protocol after gates are enabled:
 {type: 'yclients_response_entity', payload: {entity_type, entity}}
 ```
 
-Employee payload: ID and name parts. Client adds phone, birthdate, sex, comer. Visit adds date, employee, client. The current sender passes the full frame URL, possibly with path/query, as `targetOrigin`; browser behavior must be verified before rollout.
+Employee payload: ID and name parts. Client adds phone, birthdate, sex, comer. Visit adds date, employee, client. The entity channel derives `targetOrigin` from the declared frame URL and accepts messages only from the iframe window and that exact origin. A redirect to another origin breaks `postMessage`.
 
 ## Chat and sidebar frames
 
@@ -217,7 +217,7 @@ POST /marketplace/application/install_frame
 POST /marketplace/application/toggle_highlight
 ```
 
-Types are `chat`, `waiting_list`, `task_tracker`. Ownership and active installation are checked, then an application allowlist is enforced. Waiting list and task tracker are additionally YCLIENTS-brand-only in the frontend. Frame-limit exhaustion logs `Frames limit reached` but can return success-like output without a row. Treat status as unverified unless the effective frame is observed.
+Types are `chat`, `waiting_list`, `task_tracker`; do not confuse them with developer `employee/client/visit` frames. Ownership and active installation are checked. The rollout release removes the historical application allowlist and Altegio/YCLIENTS frontend brand gates. Frame-limit exhaustion logs `Frames limit reached` but can return success-like output without a row. The partner API has no effective-frame read endpoint, so the MCP reports the result as unverified rather than claiming creation.
 
 ## Webhooks and lifecycle callbacks
 
@@ -272,17 +272,17 @@ Developer application output includes generated short links `info` and `review`.
 | backoffice permission                     | 10 minutes | user-scoped                                                                    |
 | top-up marker                             | 30 minutes | location + application slug                                                    |
 
-Developer frame declaration save does not invalidate already materialized location frame containers and does not rewrite installed frame rows. A URL edit may remain stale until another invalidating operation or the one-week TTL.
+Developer frame declaration save does not invalidate or rewrite already materialized location frame rows. A later installation copies current declarations; there is no backfill/sync for existing installations.
 
 ## Rollout gates and known limitations
 
-- Entity frames: global frontend constant off plus application/location allowlists.
+- Entity frames require the backend/frontend rollout release; declarations saved before it remain inert until a new installation.
 - Waiting list/task tracker: YCLIENTS-only frontend plus application allowlist.
 - Chat: usable through activation callback, but one shared slot per location.
 - Arbitrary iframe types or main-menu items: no configuration extension point found.
 - Schedule webhook: setting is not propagated into actual webhook DTO.
 - Marketplace callback lifecycle is production-only.
-- Iframes have no sandbox; Settings postMessage does not validate origin on the host side.
+- Iframes have no sandbox. Entity-frame postMessage is strict-origin; the separate Settings channel does not validate origin on the host side.
 - Public v3 is future-facing; this implementation uses v1/v2 wire contracts.
 - Internal Developer Cabinet/backoffice APIs may change with the first-party frontend. Keep them behind adapters and contract tests.
 - `is_push_enabled` defaults differ between DB (0) and model (1); explicitly saving the setting removes ambiguity.
