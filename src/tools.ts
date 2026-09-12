@@ -7,6 +7,7 @@ import { MarketplaceError } from './errors.js';
 import { planned, requireBackoffice, requireConfirmation } from './safety.js';
 import {
   accountPayload,
+  createAccountPayload,
   createApplicationPayload,
   date,
   dateTime,
@@ -123,7 +124,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
     tool(
       'marketplace_create_developer_account',
       'Plan or create a developer account. Any partner token returned upstream is redacted from the tool response.',
-      z.object({ ...mutation, account: accountPayload }).strict(),
+      z.object({ ...mutation, account: createAccountPayload }).strict(),
       {},
       async ({ mode: applyMode, account }) => {
         const path = '/marketplace/developers/companies';
@@ -602,14 +603,16 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
         .object({
           ...partnerAndApp,
           location_id: positiveId,
+          tariff_option_id: positiveId,
           discount: z.number().min(0).max(100).default(0),
         })
         .strict(),
       { readOnly: true },
-      async ({ partner_id, application_id, location_id, discount }) =>
+      async ({ partner_id, application_id, location_id, tariff_option_id, discount }) =>
         partnerRead(partner_id, application_id, '/marketplace/application/payment_link', {
           salon_id: location_id,
           application_id,
+          tariff_option_id,
           discount,
         })
     ),

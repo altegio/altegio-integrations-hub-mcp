@@ -1,5 +1,6 @@
 const secretKeys = new Set([
   'access_token',
+  'application_token',
   'api_key',
   'authorization',
   'partner_token',

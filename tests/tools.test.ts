@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -59,7 +60,7 @@ describe('tool contracts', () => {
         price: '0',
         trial_duration: 0,
         channels: [],
-        permissions: [],
+        permissions: {},
         callback_url: '',
         registration_redirect_url: '',
         is_personal_data_access_needed: false,
@@ -91,6 +92,26 @@ describe('tool contracts', () => {
     expect(write?.options.partnerToken).toBe('owned-partner-token');
   });
 
+  test('payment-link request includes the required tariff option', async () => {
+    const client = new FakeClient();
+    const target = buildTools(testConfig, client).find(
+      (item) => item.name === 'marketplace_get_payment_link'
+    )!;
+    await target.handler({
+      partner_id: 3,
+      application_id: 7,
+      location_id: 55,
+      tariff_option_id: 9,
+      discount: 15,
+    });
+    expect(client.calls.at(-1)).toMatchObject({
+      path: '/marketplace/application/payment_link',
+      options: {
+        query: { salon_id: 55, application_id: 7, tariff_option_id: 9, discount: 15 },
+      },
+    });
+  });
+
   test('lifecycle validation uses the owned developer-account token', async () => {
     const target = buildTools(testConfig, new FakeClient()).find(
       (item) => item.name === 'marketplace_validate_lifecycle_callback'
@@ -106,6 +127,35 @@ describe('tool contracts', () => {
         },
       })
     ).resolves.toMatchObject({ valid: true, token_valid: true });
+  });
+
+  test('payment lifecycle validation checks the documented HMAC payload', async () => {
+    const target = buildTools(testConfig, new FakeClient()).find(
+      (item) => item.name === 'marketplace_validate_lifecycle_callback'
+    )!;
+    const sign = createHmac('sha256', 'owned-partner-token')
+      .update('salon_id=55&amount=100&discount=5')
+      .digest('hex');
+    await expect(
+      target.handler({
+        partner_id: 3,
+        payload: {
+          salon_id: 55,
+          application_id: 7,
+          event: 'payment',
+          partner_token: 'owned-partner-token',
+          payment_id: 11,
+          amount: 100,
+          currency_iso: 'BRL',
+          discount: 5,
+          period_from: '2026-09-12 10:00:00',
+          period_to: '2026-10-12 10:00:00',
+          payment_date: '2026-09-12 10:00:00',
+          tariff_option_id: 9,
+          sign,
+        },
+      })
+    ).resolves.toMatchObject({ valid: true, token_valid: true, signature_valid: true });
   });
 
   test('concurrent payment retries apply once per durable idempotency key', async () => {

@@ -19,13 +19,17 @@ export const accountPayload = z
     phone: z.string().min(5),
     email: z.string().email(),
     website_url: httpsUrl,
-    legal_type: z.string().min(1).default('llc'),
+    legal_type: z.enum(['llc', 'cjsc', 'jsc', 'ie', 'np', 'le']).default('llc'),
     country_id: positiveId.optional(),
     company_name: z.string().min(1).optional(),
     reg_number: z.string().min(1).optional(),
     privacy_policy_url: httpsUrl.optional(),
   })
   .strict();
+
+export const createAccountPayload = accountPayload.extend({
+  partner_token: z.string().min(1).optional(),
+});
 
 const baseApplication = {
   title: z.string().min(3),
@@ -37,7 +41,7 @@ const baseApplication = {
   price: z.string(),
   trial_duration: z.number().int().nonnegative(),
   channels: z.array(positiveId),
-  permissions: z.array(z.string().min(1)),
+  permissions: z.record(z.string().min(1), z.union([z.literal(0), z.literal(1)])),
   callback_url: z.union([httpsUrl, z.literal('')]).default(''),
   registration_redirect_url: z.union([httpsUrl, z.literal('')]).default(''),
   is_personal_data_access_needed: z.boolean().default(false),
@@ -50,7 +54,7 @@ const baseApplication = {
     .regex(/^[A-Za-z0-9]+$/),
   is_nonpublic: z.boolean().default(false),
   nonpublic_webhook_url: httpsUrl.nullable().optional(),
-  monetization_type: z.string().min(1),
+  monetization_type: z.enum(['free', 'paid', 'freemium']),
 };
 
 export const createApplicationPayload = z.object(baseApplication).strict();
@@ -68,7 +72,21 @@ export const updateApplicationPayload = z
         .object({ question: z.string().min(3).max(100), answer: z.string().min(3).max(1000) })
         .strict()
     ),
-    functionalities: z.array(z.string().min(1)),
+    functionalities: z.array(
+      z.enum([
+        'chat',
+        'mass_sendings',
+        'service_sendings',
+        'cascades',
+        'approving',
+        'returns',
+        'rfm',
+        'maps_reviews',
+        'interceptor',
+        'analytics',
+        'tasks',
+      ])
+    ),
   })
   .strict();
 
