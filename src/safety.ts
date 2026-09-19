@@ -26,16 +26,3 @@ export function planned(request: PlannedRequest): Record<string, unknown> {
     plan: request,
   };
 }
-
-export function requireBackoffice(enabled: boolean, adminToken: string | undefined): string {
-  if (!enabled) {
-    throw new MarketplaceError(
-      'Backoffice tools are disabled. Set ALLOW_BACKOFFICE=true for an approved admin deployment.',
-      403
-    );
-  }
-  if (!adminToken) {
-    throw new MarketplaceError('Backoffice tools require ALTEGIO_ADMIN_USER_TOKEN.', 401);
-  }
-  return adminToken;
-}

@@ -10,7 +10,7 @@ describe('tool contracts', () => {
   test('tool names are unique and surface is broad', () => {
     const tools = buildTools(testConfig, new FakeClient());
     expect(new Set(tools.map((item) => item.name)).size).toBe(tools.length);
-    expect(tools.length).toBeGreaterThanOrEqual(30);
+    expect(tools).toHaveLength(33);
     expect(tools.map((item) => item.name)).toEqual(
       expect.arrayContaining([
         'integrations_hub_create_application',
@@ -18,9 +18,9 @@ describe('tool contracts', () => {
         'integrations_hub_record_payment',
         'integrations_hub_get_statistics',
         'integrations_hub_replace_entity_frames',
-        'integrations_hub_backoffice_set_publication',
       ])
     );
+    expect(tools.every((item) => !item.name.includes('backoffice'))).toBe(true);
   });
 
   test('plan mode performs no write', async () => {
@@ -427,12 +427,5 @@ describe('tool contracts', () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
-  });
-
-  test('backoffice remains disabled by default', async () => {
-    const target = buildTools(testConfig, new FakeClient()).find(
-      (item) => item.name === 'integrations_hub_backoffice_get_application'
-    )!;
-    await expect(target.handler({ application_id: 7 })).rejects.toThrow('disabled');
   });
 });

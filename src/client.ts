@@ -2,7 +2,7 @@ import type { Config } from './config.js';
 import { requestContext } from './context.js';
 import { MarketplaceError } from './errors.js';
 
-export type AuthLane = 'public' | 'user' | 'partner' | 'admin';
+export type AuthLane = 'public' | 'user' | 'partner';
 
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -23,8 +23,7 @@ interface ApiEnvelope {
 export class MarketplaceClient {
   constructor(private readonly config: Config) {}
 
-  private userToken(lane: AuthLane): string | undefined {
-    if (lane === 'admin') return this.config.ALTEGIO_ADMIN_USER_TOKEN;
+  private userToken(): string | undefined {
     return requestContext()?.userToken ?? this.config.ALTEGIO_USER_TOKEN;
   }
 
@@ -40,8 +39,8 @@ export class MarketplaceClient {
     const headers: Record<string, string> = { Accept: 'application/vnd.api.v2+json' };
     if (options.lane !== 'public') {
       const auth = [`Bearer ${options.partnerToken ?? this.config.ALTEGIO_PARTNER_TOKEN}`];
-      if (options.lane === 'user' || options.lane === 'admin') {
-        const token = this.userToken(options.lane);
+      if (options.lane === 'user') {
+        const token = this.userToken();
         if (!token)
           throw new MarketplaceError('An Altegio user token is required for this operation.', 401);
         auth.push(`User ${token}`);
