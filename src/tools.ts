@@ -4,7 +4,7 @@ import type { Config } from './config.js';
 import { MarketplaceClient } from './client.js';
 import { IdempotencyStore } from './idempotency.js';
 import { MarketplaceError } from './errors.js';
-import { planned, requireBackoffice, requireConfirmation } from './safety.js';
+import { planned, requireConfirmation } from './safety.js';
 import {
   accountPayload,
   createAccountPayload,
@@ -15,7 +15,6 @@ import {
   installationSettings,
   mode,
   positiveId,
-  specialOffer,
   updateApplicationPayload,
 } from './schemas.js';
 
@@ -1089,179 +1088,6 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
             tariff_option_id: payload.tariff_option_id,
           },
         };
-      }
-    ),
-    tool(
-      'integrations_hub_backoffice_get_application',
-      'Read internal Marketplace backoffice data. This is not a public API and is disabled by default.',
-      z.object({ application_id: positiveId }).strict(),
-      { readOnly: true },
-      async ({ application_id }) => {
-        requireBackoffice(config.ALLOW_BACKOFFICE, config.ALTEGIO_ADMIN_USER_TOKEN);
-        return client.request(`/marketplace/developers/backoffice/application/${application_id}`, {
-          lane: 'admin',
-        });
-      }
-    ),
-    tool(
-      'integrations_hub_backoffice_set_publication',
-      'Plan or set/clear the internal moderated_at publication timestamp. Internal API; disabled by default.',
-      z
-        .object({
-          ...mutation,
-          application_id: positiveId,
-          moderated_at: dateTime.nullable(),
-          confirmation: z.string().optional(),
-        })
-        .strict(),
-      {},
-      async ({ mode: applyMode, application_id, moderated_at, confirmation }) => {
-        requireBackoffice(config.ALLOW_BACKOFFICE, config.ALTEGIO_ADMIN_USER_TOKEN);
-        const path = `/marketplace/developers/backoffice/application/${application_id}/moderation`;
-        const body = { moderated_at };
-        if (applyMode === 'plan')
-          return pathPlan(
-            'backoffice_set_publication',
-            'POST',
-            path,
-            body,
-            'Internal production publication control.'
-          );
-        requireConfirmation(
-          confirmation,
-          `${moderated_at ? 'PUBLISH' : 'UNPUBLISH'} APPLICATION ${application_id}`
-        );
-        return bodyResult(
-          'backoffice_set_publication',
-          await client.request(path, { method: 'POST', lane: 'admin', body })
-        );
-      }
-    ),
-    tool(
-      'integrations_hub_backoffice_set_commercials',
-      'Plan or set internal commission/boost values. Internal API; disabled by default.',
-      z
-        .object({
-          ...mutation,
-          application_id: positiveId,
-          commission: z.number().int().min(0).max(100).optional(),
-          boost: z.number().finite().optional(),
-          confirmation: z.string().optional(),
-        })
-        .strict()
-        .refine(
-          (value) => value.commission !== undefined || value.boost !== undefined,
-          'commission or boost is required'
-        ),
-      {},
-      async ({ mode: applyMode, application_id, commission, boost, confirmation }) => {
-        requireBackoffice(config.ALLOW_BACKOFFICE, config.ALTEGIO_ADMIN_USER_TOKEN);
-        if (applyMode === 'plan')
-          return pathPlan(
-            'backoffice_set_commercials',
-            'POST',
-            `/marketplace/developers/backoffice/application/${application_id}/{commission|boost}`,
-            { commission, boost },
-            'Internal ranking/commercial control.'
-          );
-        requireConfirmation(confirmation, `SET COMMERCIALS FOR APPLICATION ${application_id}`);
-        const results: unknown[] = [];
-        if (commission !== undefined)
-          results.push(
-            await client.request(
-              `/marketplace/developers/backoffice/application/${application_id}/commission`,
-              { method: 'POST', lane: 'admin', body: { commission } }
-            )
-          );
-        if (boost !== undefined)
-          results.push(
-            await client.request(
-              `/marketplace/developers/backoffice/application/${application_id}/boost`,
-              { method: 'POST', lane: 'admin', body: { boost } }
-            )
-          );
-        return bodyResult('backoffice_set_commercials', results);
-      }
-    ),
-    tool(
-      'integrations_hub_backoffice_delete_application',
-      'Delete an application and partner-linked entities through the internal backoffice API. Disabled by default and highly destructive.',
-      z
-        .object({ ...mutation, application_id: positiveId, confirmation: z.string().optional() })
-        .strict(),
-      { destructive: true },
-      async ({ mode: applyMode, application_id, confirmation }) => {
-        requireBackoffice(config.ALLOW_BACKOFFICE, config.ALTEGIO_ADMIN_USER_TOKEN);
-        const path = `/marketplace/developers/backoffice/application/${application_id}/delete`;
-        if (applyMode === 'plan')
-          return pathPlan(
-            'backoffice_delete_application',
-            'POST',
-            path,
-            undefined,
-            'Deletes application and related partner entities.'
-          );
-        requireConfirmation(confirmation, `BACKOFFICE DELETE APPLICATION ${application_id}`);
-        return bodyResult(
-          'backoffice_delete_application',
-          await client.request(path, { method: 'POST', lane: 'admin' })
-        );
-      }
-    ),
-    tool(
-      'integrations_hub_backoffice_list_offers',
-      'List internal Marketplace special offers. Internal API; disabled by default.',
-      z.object({}).strict(),
-      { readOnly: true },
-      async () => {
-        requireBackoffice(config.ALLOW_BACKOFFICE, config.ALTEGIO_ADMIN_USER_TOKEN);
-        return client.request('/marketplace/developers/backoffice/offers', { lane: 'admin' });
-      }
-    ),
-    tool(
-      'integrations_hub_backoffice_upsert_offer',
-      'Plan or create/update an internal Marketplace special offer. Internal API; disabled by default.',
-      z
-        .object({
-          ...mutation,
-          offer_id: positiveId.optional(),
-          offer: specialOffer,
-          confirmation: z.string().optional(),
-        })
-        .strict(),
-      {},
-      async ({ mode: applyMode, offer_id, offer, confirmation }) => {
-        requireBackoffice(config.ALLOW_BACKOFFICE, config.ALTEGIO_ADMIN_USER_TOKEN);
-        const path = offer_id
-          ? `/marketplace/developers/backoffice/offers/${offer_id}`
-          : '/marketplace/developers/backoffice/offers';
-        const method = offer_id ? 'PUT' : 'POST';
-        if (applyMode === 'plan') return pathPlan('backoffice_upsert_offer', method, path, offer);
-        requireConfirmation(
-          confirmation,
-          `${offer_id ? 'UPDATE' : 'CREATE'} MARKETPLACE OFFER${offer_id ? ` ${offer_id}` : ''}`
-        );
-        return bodyResult(
-          'backoffice_upsert_offer',
-          await client.request(path, { method, lane: 'admin', body: offer })
-        );
-      }
-    ),
-    tool(
-      'integrations_hub_backoffice_delete_offer',
-      'Delete an internal Marketplace special offer. Internal API; disabled by default.',
-      z.object({ ...mutation, offer_id: positiveId, confirmation: z.string().optional() }).strict(),
-      { destructive: true },
-      async ({ mode: applyMode, offer_id, confirmation }) => {
-        requireBackoffice(config.ALLOW_BACKOFFICE, config.ALTEGIO_ADMIN_USER_TOKEN);
-        const path = `/marketplace/developers/backoffice/offers/${offer_id}`;
-        if (applyMode === 'plan')
-          return pathPlan('backoffice_delete_offer', 'DELETE', path, undefined, 'Destructive');
-        requireConfirmation(confirmation, `DELETE MARKETPLACE OFFER ${offer_id}`);
-        return bodyResult(
-          'backoffice_delete_offer',
-          await client.request(path, { method: 'DELETE', lane: 'admin' })
-        );
       }
     ),
   ];

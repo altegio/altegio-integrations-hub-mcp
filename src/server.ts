@@ -44,7 +44,7 @@ const resources = [
     name: 'integrations_hub_tool_boundaries',
     title: 'Tool and API boundaries',
     description:
-      'Public, Developer Cabinet, restricted, and internal backoffice surface classification.',
+      'Public, Developer Cabinet, partner, and restricted owner-facing surface classification.',
     file: 'tool-boundaries.md',
   },
 ] as const;
@@ -77,7 +77,7 @@ export function createServer(config: Config): Server {
         prompts: { listChanged: false },
       },
       instructions:
-        'Automate the Altegio Integrations Hub application lifecycle. Start with read tools and mode=plan. Developer Cabinet operations use the caller Altegio token. Partner actions verify application ownership. Internal backoffice tools are disabled by default. Read altegio://integrations-hub/tool-boundaries before using restricted surfaces.',
+        'Automate an Altegio developer account and its Integrations Hub applications. Start with read tools and mode=plan. Developer Cabinet operations use the caller Altegio token. Partner actions verify application ownership. Marketplace administration, moderation decisions, publication, ranking, commissions, and special-offer management are intentionally outside this public MCP. Read altegio://integrations-hub/tool-boundaries before using restricted owner-facing surfaces.',
     }
   );
   const specs = buildTools(config).sort((left, right) => left.name.localeCompare(right.name));
@@ -156,7 +156,7 @@ export function createServer(config: Config): Server {
           role: 'user',
           content: {
             type: 'text',
-            text: `Use developer account ${partnerId} and dedicated test location ${locationId}. Read altegio://integrations-hub/safe-e2e, inspect current accounts/metadata/rights, and run every mutation with mode=plan before mode=apply. Keep the app non-public/draft, request minimum permissions, verify pending/active state and callbacks, update one reversible field, verify again, then only uninstall if I explicitly provide the tool's exact confirmation phrase. Never invoke backoffice publication.`,
+            text: `Use developer account ${partnerId} and dedicated test location ${locationId}. Read altegio://integrations-hub/safe-e2e, inspect current accounts/metadata/rights, and run every mutation with mode=plan before mode=apply. Keep the app non-public/draft, request minimum permissions, verify pending/active state and callbacks, update one reversible field, verify again, then only uninstall if I explicitly provide the tool's exact confirmation phrase. Submit for human moderation when ready; this public MCP cannot publish or moderate applications.`,
           },
         },
       ],

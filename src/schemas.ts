@@ -161,17 +161,3 @@ export const installationSettings = z
     secret_key: z.string().min(1).optional().describe('Optional application secret key; secret'),
   })
   .strict();
-
-export const specialOffer = z
-  .object({
-    title: z.string().min(2).max(255),
-    description: z.string().min(2),
-    short_description: z.string().min(2).max(255),
-    url: httpsUrl,
-    type_description: z.string().min(2).max(255),
-    icon_url: httpsUrl,
-    promocode: z.string().min(2).max(255).nullable().optional(),
-    expiration_date: date,
-    priority: z.number().int().default(0),
-  })
-  .strict();

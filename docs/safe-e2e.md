@@ -13,6 +13,6 @@ Use a dedicated test location whose owner has agreed to the installation. Keep t
 9. Change one reversible card field with `integrations_hub_update_application`; review the full replacement plan, apply with its confirmation phrase, then read the app again and compare. Frame declarations are also full replacement, so always read them first.
 10. To disable the test integration, call `integrations_hub_uninstall` in plan mode. Apply only with `UNINSTALL APPLICATION <application_id> FROM LOCATION <location_id>`. Verify `uninstalled` in the status log/list. Re-grant is required for a new install.
 
-Do not publish through backoffice as part of testing. Normal publication starts with `integrations_hub_save_moderation_instructions` and `integrations_hub_submit_for_moderation`; human review remains an intentional product gate.
+Normal owner publication flow stops after `integrations_hub_save_moderation_instructions` and `integrations_hub_submit_for_moderation`; human review remains an intentional product gate. This public MCP has no Marketplace administrator or publication tools.
 
 Freeze has no partner command. It is driven by expiry/billing inside Biz.ERP. A successful `integrations_hub_record_payment` can unfreeze an eligible installation and must use a durable idempotency key.

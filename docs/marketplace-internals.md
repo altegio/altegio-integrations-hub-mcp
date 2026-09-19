@@ -2,6 +2,8 @@
 
 This is the implementation reference for projects integrating with Altegio Integrations Hub. The underlying Biz.ERP module, routes, namespaces, tables, and DTOs retain their legacy Marketplace names. It is intentionally dry: facts, contracts, limits, and source paths. Verified against Biz.ERP `c6a74fd7ea8` on 2026-09-19 and public API docs `1a60136b5`.
 
+This public MCP implements only application-owner and partner workflows. Upstream backoffice facts are retained here solely to explain the authorization boundary; Marketplace administrator actions belong in a separate moderator-only skill or service.
+
 ## Architecture and ownership
 
 Marketplace is a Biz.ERP module, not a separate service. Its HTTP surface is split between:
@@ -102,7 +104,7 @@ POST /api/v1/marketplace/developers/companies/{partnerId}/applications/{applicat
 
 Create requires title, short description, category ID, country IDs, website URL, price string, nonnegative trial days, channel IDs, a flat permission map, an alphanumeric slug, and monetization type (`free`, `paid`, or `freemium`). Most permission entries are `0|1` flags, but the authoritative application response also contains integer IDs and day-limit fields such as `-1` for unlimited history; full-card updates must round-trip those integer values unchanged. Optional/default technical fields are icon, callback URL, registration redirect URL, personal-data access, multiple locations, iframe, private/nonpublic flag, and nonpublic webhook URL. Update is a full replacement-style payload and adds long description, feature strings, promo materials `{type: image|video, content}`, FAQ `{question, answer}`, and validated functionality slugs. Read the current application first; omission may clear values. Source: `CreateApplicationDto.php`, `UpdateApplicationDto.php`, `MarketplacePermissionsDict.php`.
 
-Moderation instructions accept `connect_instruction` and `payment_instruction` (empty or 3–1000 characters). `moderation/start` records submission; it does not itself publish. Backoffice publication writes `moderated_at` and is intentionally separate.
+Moderation instructions accept `connect_instruction` and `payment_instruction` (empty or 3–1000 characters). `moderation/start` records the owner's submission; it does not itself publish. A separate Marketplace administrator workflow makes the publication decision and is not exposed by this MCP.
 
 Public dictionaries:
 
@@ -286,7 +288,7 @@ Developer frame declaration save does not invalidate or rewrite already material
 - Marketplace callback lifecycle is production-only.
 - Iframes have no sandbox. Entity-frame postMessage is strict-origin; the separate Settings channel does not validate origin on the host side.
 - Public v3 is future-facing; this implementation uses v1/v2 wire contracts.
-- Internal Developer Cabinet/backoffice APIs may change with the first-party frontend. Keep them behind adapters and contract tests.
+- Internal Developer Cabinet APIs may change with the first-party frontend. Keep them behind adapters and contract tests; do not add backoffice routes to this public server.
 - `is_push_enabled` defaults differ between DB (0) and model (1); explicitly saving the setting removes ambiguity.
 
 ## Source index
