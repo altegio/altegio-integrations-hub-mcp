@@ -58,6 +58,44 @@ describe('tool contracts', () => {
         '/marketplace/applications/functionalities',
       ])
     );
+    expect(client.calls.every((call) => call.options.lane === 'user')).toBe(true);
+  });
+
+  test('existing application slugs with underscores remain editable', () => {
+    const target = buildTools(testConfig, new FakeClient()).find(
+      (item) => item.name === 'integrations_hub_update_application'
+    )!;
+    const parsed = target.schema.safeParse({
+      mode: 'plan',
+      partner_id: 3,
+      application_id: 7,
+      application: {
+        title: 'Existing app',
+        short_description: 'Existing app',
+        category_id: 1,
+        country_ids: [1],
+        website_url: 'https://example.com',
+        price: '',
+        trial_duration: 0,
+        channels: [],
+        permissions: {},
+        callback_url: '',
+        registration_redirect_url: '',
+        is_personal_data_access_needed: false,
+        is_multiple_salons_allowed: false,
+        is_iframe: false,
+        slug: 'existing_app',
+        is_nonpublic: false,
+        monetization_type: 'free',
+        full_description: 'Existing app description',
+        features_description: [],
+        promo_materials: [],
+        questions: [],
+        functionalities: [],
+      },
+    });
+
+    expect(parsed.success).toBe(true);
   });
 
   test('create application is idempotent by slug', async () => {

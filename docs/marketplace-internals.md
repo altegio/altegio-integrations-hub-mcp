@@ -113,7 +113,7 @@ GET /api/v1/marketplace/applications/functionalities
 GET /api/v1/countries
 ```
 
-Categories `analytics` and `ai_bots` exist. Category selection affects discovery only; it does not grant permissions or UI placement.
+These routes belong to the public catalogue surface, but the current production gateway rejects unauthenticated requests; the MCP sends the caller's normal Developer Cabinet authorization. Categories `analytics` and `ai_bots` exist. Category selection affects discovery only; it does not grant permissions or UI placement. Existing application slugs may contain underscores even though the create validator's human-facing message describes Latin letters and numbers; preserve such slugs during full-card updates.
 
 ## Installation state machine
 

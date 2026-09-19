@@ -264,10 +264,10 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       { readOnly: true },
       async () => {
         const [categories, countries, channels, functionalities] = await Promise.all([
-          client.request('/marketplace/applications/categories', { lane: 'public' }),
-          client.request('/countries', { lane: 'public' }),
-          client.request('/marketplace/applications/channels', { lane: 'public' }),
-          client.request('/marketplace/applications/functionalities', { lane: 'public' }),
+          client.request('/marketplace/applications/categories', { lane: 'user' }),
+          client.request('/countries', { lane: 'user' }),
+          client.request('/marketplace/applications/channels', { lane: 'user' }),
+          client.request('/marketplace/applications/functionalities', { lane: 'user' }),
         ]);
         return { categories, countries, channels, functionalities };
       }
