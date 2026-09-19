@@ -60,6 +60,10 @@ describe('HTTP transport', () => {
       expect(tools.status).toBe(200);
       expect(toolList).toContain('marketplace_create_application');
       expect(toolList).toContain('marketplace_validate_lifecycle_callback');
+      expect(toolList).toContain('marketplace_list_entity_frames');
+      expect(toolList).toContain('marketplace_replace_entity_frames');
+      expect(toolList).toContain('marketplace_install_sidebar_frame');
+      expect(toolList).toContain('outputSchema');
     } finally {
       await new Promise<void>((resolve, reject) =>
         listener.close((error) => (error ? reject(error) : resolve()))

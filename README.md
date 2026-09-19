@@ -81,6 +81,8 @@ docker run --rm -p 8094:8094 -e ALTEGIO_PARTNER_TOKEN=test altegio-marketplace-m
 
 Tests cover schemas/safety, request-scoped authentication, upstream error normalization, tool inventory, plan no-op behavior, application idempotency, normalized install payloads, backoffice gates, and Streamable HTTP initialization.
 
+The current contract/completeness review is [docs/AUDIT-2026-09-19.md](docs/AUDIT-2026-09-19.md). The four dedicated iframe tools publish MCP output schemas; the remaining tool families still expose raw or lightly wrapped upstream output and are tracked as follow-up work in that audit.
+
 Live mutation tests are intentionally not part of CI because they would create Marketplace state. Use the `marketplace_safe_draft_rollout` prompt against an approved test location.
 
 ## Known platform limits
