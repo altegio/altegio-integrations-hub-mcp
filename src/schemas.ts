@@ -93,7 +93,10 @@ const baseApplication = {
     .string()
     .min(3)
     .max(200)
-    .regex(/^[A-Za-z0-9]+$/),
+    .regex(/^[A-Za-z0-9_]+$/)
+    .describe(
+      'Stable application identifier; existing Integrations Hub slugs may contain underscores'
+    ),
   is_nonpublic: z.boolean().default(false).describe('Keep the application private/non-public'),
   nonpublic_webhook_url: httpsUrl
     .nullable()
