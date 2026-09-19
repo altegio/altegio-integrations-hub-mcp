@@ -1,6 +1,6 @@
 # Biz.ERP Marketplace internals
 
-This is the implementation reference for projects integrating with Altegio Marketplace. It is intentionally dry: facts, contracts, limits, and source paths. Verified against Biz.ERP `6c25807e7c5` on 2026-09-12 and public API docs `1a60136b5`.
+This is the implementation reference for projects integrating with Altegio Marketplace. It is intentionally dry: facts, contracts, limits, and source paths. Verified against Biz.ERP `c6a74fd7ea8` on 2026-09-19 and public API docs `1a60136b5`.
 
 ## Architecture and ownership
 
@@ -86,6 +86,8 @@ DELETE /api/v1/marketplace/developers/companies/{partnerId}
 ```
 
 Create fields: `title`, `description`, `name`, `phone`, `email`, `website_url`; optional/default `legal_type`, `partner_token`. Update additionally accepts `country_id`, `company_name`, `reg_number`, `privacy_policy_url` but still reads the complete base fields. Sources: `CreatePartnerDto.php`, `UpdatePartnerDto.php`.
+
+Current Biz.ERP normalizes a bare domain in `website_url` and `privacy_policy_url` by prepending `https://`; it also accepts an explicit URL scheme. The MCP deliberately requires an explicit HTTPS URL so an automated caller cannot accidentally select an insecure or ambiguous destination.
 
 Application endpoints:
 

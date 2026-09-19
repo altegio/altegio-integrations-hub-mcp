@@ -55,6 +55,9 @@ function toTool(spec: ToolSpec): Tool {
     name: spec.name,
     description: spec.description,
     inputSchema: jsonSchema,
+    outputSchema: spec.outputSchema
+      ? (z.toJSONSchema(spec.outputSchema) as Tool['outputSchema'])
+      : undefined,
     annotations: {
       readOnlyHint: spec.readOnly,
       destructiveHint: spec.destructive,

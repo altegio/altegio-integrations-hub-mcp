@@ -23,6 +23,7 @@ export interface ToolSpec {
   name: string;
   description: string;
   schema: z.ZodObject<z.ZodRawShape>;
+  outputSchema?: z.ZodObject<z.ZodRawShape>;
   readOnly: boolean;
   destructive: boolean;
   handler(input: unknown): Promise<unknown>;
@@ -32,13 +33,18 @@ function tool<T extends z.ZodRawShape>(
   name: string,
   description: string,
   schema: z.ZodObject<T>,
-  annotations: { readOnly?: boolean; destructive?: boolean },
+  annotations: {
+    readOnly?: boolean;
+    destructive?: boolean;
+    outputSchema?: z.ZodObject<z.ZodRawShape>;
+  },
   handler: (input: z.infer<typeof schema>) => Promise<unknown>
 ): ToolSpec {
   return {
     name,
     description,
     schema,
+    outputSchema: annotations.outputSchema,
     readOnly: annotations.readOnly ?? false,
     destructive: annotations.destructive ?? false,
     handler: async (input) => handler(schema.parse(input)),
@@ -74,19 +80,22 @@ function paymentSignature(
   return createHmac('sha256', token).update(parts.join('&')).digest('hex');
 }
 
+const entityFrame = z
+  .object({
+    title: z.string().min(3).max(100).describe('Tab title shown inside the entity card'),
+    url: httpsUrl.describe(
+      'HTTPS iframe URL. Redirects must preserve this URL origin or postMessage will fail.'
+    ),
+    slug: z
+      .enum(['employee', 'client', 'visit'])
+      .describe('Entity card where this iframe tab is shown'),
+  })
+  .strict();
+
 const entityFrames = z
-  .array(
-    z
-      .object({
-        title: z.string().min(3).max(100),
-        url: httpsUrl.describe(
-          'HTTPS iframe URL. Redirects must preserve this URL origin or postMessage will fail.'
-        ),
-        slug: z.enum(['employee', 'client', 'visit']),
-      })
-      .strict()
-  )
+  .array(entityFrame)
   .max(3)
+  .describe('Complete replacement set of entity iframe declarations; omitted slugs are deleted')
   .superRefine((frames, context) => {
     const seen = new Set<string>();
     frames.forEach((frame, index) => {
@@ -100,6 +109,33 @@ const entityFrames = z
       seen.add(frame.slug);
     });
   });
+
+const entityFrameListOutput = z
+  .object({
+    success: z.boolean().optional().describe('Upstream request success flag'),
+    data: z.array(entityFrame).optional().describe('Current declared entity iframe definitions'),
+    meta: z.unknown().optional().describe('Optional upstream response metadata'),
+    error: z.string().optional().describe('Safe error message when the tool fails'),
+    status: z.number().int().optional().describe('Optional upstream HTTP status on failure'),
+    details: z.unknown().optional().describe('Bounded upstream error details'),
+  })
+  .loose()
+  .describe('Developer Frames API response');
+
+const frameMutationOutput = z
+  .object({
+    ok: z.literal(true).optional(),
+    applied: z.boolean().optional().describe('False for a plan; true after a successful write'),
+    plan: z.unknown().optional().describe('Normalized upstream request returned in plan mode'),
+    operation: z.string().optional(),
+    data: z.unknown().optional().describe('Raw upstream write response'),
+    verification: z.unknown().optional().describe('Explicit post-write verification evidence'),
+    error: z.string().optional().describe('Safe error message when the tool fails'),
+    status: z.number().int().optional().describe('Optional upstream HTTP status on failure'),
+    details: z.unknown().optional().describe('Bounded upstream error details'),
+  })
+  .loose()
+  .describe('Plan/apply mutation result');
 
 export function buildTools(config: Config, client = new MarketplaceClient(config)): ToolSpec[] {
   const idempotency = new IdempotencyStore(config.MARKETPLACE_MCP_STATE_DIR);
@@ -136,7 +172,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
 
   const partnerAndApp = {
     partner_id: positiveId.describe('Developer account ID used for caller ownership checks'),
-    application_id: positiveId,
+    application_id: positiveId.describe('Marketplace application ID owned by that account'),
   };
   const mutation = { mode };
 
@@ -282,7 +318,10 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
           ...mutation,
           ...partnerAndApp,
           application: updateApplicationPayload,
-          confirmation: z.string().optional(),
+          confirmation: z
+            .string()
+            .optional()
+            .describe('Exact phrase shown by plan mode and required by apply mode'),
         })
         .strict(),
       { destructive: true },
@@ -354,7 +393,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       'marketplace_list_entity_frames',
       'List declared employee/client/visit iframe definitions. Declarations are copied to a location only during a later application installation.',
       z.object(partnerAndApp).strict(),
-      { readOnly: true },
+      { readOnly: true, outputSchema: entityFrameListOutput },
       async ({ partner_id, application_id }) => {
         await owned(partner_id, application_id);
         return client.request(
@@ -371,10 +410,13 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
           ...mutation,
           ...partnerAndApp,
           frames: entityFrames,
-          confirmation: z.string().optional(),
+          confirmation: z
+            .string()
+            .optional()
+            .describe('Exact phrase shown by plan mode and required by apply mode'),
         })
         .strict(),
-      { destructive: true },
+      { destructive: true, outputSchema: frameMutationOutput },
       async ({ mode: applyMode, partner_id, application_id, frames, confirmation }) => {
         await owned(partner_id, application_id);
         const path = `/marketplace/developers/companies/${partner_id}/applications/${application_id}/frames`;
@@ -616,13 +658,20 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
         .object({
           ...mutation,
           ...partnerAndApp,
-          location_id: positiveId,
-          type: z.enum(['chat', 'waiting_list', 'task_tracker']),
-          url: httpsUrl.nullable(),
-          confirmation: z.string().optional(),
+          location_id: positiveId.describe('Installed Altegio location ID'),
+          type: z
+            .enum(['chat', 'waiting_list', 'task_tracker'])
+            .describe('Internal sidebar slot; not an employee/client/visit entity frame'),
+          url: httpsUrl
+            .nullable()
+            .describe('HTTPS frame URL to install, or null to remove this application frame'),
+          confirmation: z
+            .string()
+            .optional()
+            .describe('Exact phrase shown by plan mode and required by apply mode'),
         })
         .strict(),
-      {},
+      { destructive: true, outputSchema: frameMutationOutput },
       async ({
         mode: applyMode,
         partner_id,
@@ -634,18 +683,17 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }) => {
         const path = '/marketplace/application/install_frame';
         const body = { salon_id: location_id, application_id, type, url };
+        const action = url === null ? 'REMOVE' : 'INSTALL';
+        const confirmationPhrase = `${action} ${type} FRAME FOR APPLICATION ${application_id} AT LOCATION ${location_id}`;
         if (applyMode === 'plan')
           return pathPlan(
             'install_sidebar_frame',
             'POST',
             path,
             body,
-            'Internal sidebar operation; do not use this tool for employee/client/visit developer frames. A success response does not guarantee creation when a location-wide limit is exhausted.'
+            `Internal sidebar operation; do not use this tool for employee/client/visit developer frames. A success response does not guarantee creation when a location-wide limit is exhausted. Apply requires: ${confirmationPhrase}`
           );
-        requireConfirmation(
-          confirmation,
-          `INSTALL ${type} FRAME FOR APPLICATION ${application_id} AT LOCATION ${location_id}`
-        );
+        requireConfirmation(confirmation, confirmationPhrase);
         const write = await partnerWrite(partner_id, application_id, path, body);
         const status = await partnerRead(
           partner_id,
@@ -673,13 +721,18 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
         .object({
           ...mutation,
           ...partnerAndApp,
-          location_id: positiveId,
-          type: z.enum(['chat', 'waiting_list', 'task_tracker']),
-          user_id: positiveId.nullable().optional(),
-          is_enabled: z.boolean(),
+          location_id: positiveId.describe('Installed Altegio location ID'),
+          type: z
+            .enum(['chat', 'waiting_list', 'task_tracker'])
+            .describe('Installed internal sidebar slot to update'),
+          user_id: positiveId
+            .nullable()
+            .optional()
+            .describe('Limit the highlight to one user, or null for the location-wide state'),
+          is_enabled: z.boolean().describe('Whether the frame should be highlighted'),
         })
         .strict(),
-      {},
+      { outputSchema: frameMutationOutput },
       async ({
         mode: applyMode,
         partner_id,

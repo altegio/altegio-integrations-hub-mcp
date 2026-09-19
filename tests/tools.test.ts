@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { z } from 'zod';
 import { buildTools } from '../src/tools.js';
 import { FakeClient, testConfig } from './helpers.js';
 
@@ -91,6 +92,43 @@ describe('tool contracts', () => {
     expect(result).toMatchObject({ applied: false, idempotent: true });
   });
 
+  test('application plan preserves embedded settings iframe configuration', async () => {
+    const client = new FakeClient();
+    const target = buildTools(testConfig, client).find(
+      (item) => item.name === 'marketplace_create_application'
+    )!;
+    const result = await target.handler({
+      mode: 'plan',
+      partner_id: 3,
+      application: {
+        title: 'Iframe app',
+        short_description: 'Iframe settings',
+        category_id: 1,
+        country_ids: [1],
+        website_url: 'https://example.com',
+        price: '0',
+        trial_duration: 0,
+        channels: [],
+        permissions: {},
+        registration_redirect_url: 'https://example.com/settings',
+        is_iframe: true,
+        slug: 'IframeApp',
+        monetization_type: 'free',
+      },
+    });
+
+    expect(client.calls).toHaveLength(0);
+    expect(result).toMatchObject({
+      applied: false,
+      plan: {
+        body: {
+          registration_redirect_url: 'https://example.com/settings',
+          is_iframe: true,
+        },
+      },
+    });
+  });
+
   test('partner activation uses normalized location input and legacy wire field', async () => {
     const client = new FakeClient();
     const target = buildTools(testConfig, client).find(
@@ -124,6 +162,45 @@ describe('tool contracts', () => {
         ],
       })
     ).rejects.toThrow('Only one visit declaration');
+  });
+
+  test('entity frame listing uses the owned Developer Cabinet route', async () => {
+    const client = new FakeClient();
+    const target = buildTools(testConfig, client).find(
+      (item) => item.name === 'marketplace_list_entity_frames'
+    )!;
+
+    await target.handler({ partner_id: 3, application_id: 7 });
+
+    expect(client.calls).toEqual([
+      {
+        path: '/marketplace/developers/companies/3/applications/7/frames',
+        options: { lane: 'user' },
+      },
+    ]);
+  });
+
+  test('entity frame tools expose described input and output contracts', () => {
+    const tools = buildTools(testConfig, new FakeClient());
+    const list = tools.find((item) => item.name === 'marketplace_list_entity_frames')!;
+    const replace = tools.find((item) => item.name === 'marketplace_replace_entity_frames')!;
+    const toggle = tools.find((item) => item.name === 'marketplace_toggle_sidebar_highlight')!;
+    const listInput = z.toJSONSchema(list.schema);
+    const replaceInput = z.toJSONSchema(replace.schema);
+    const listOutput = z.toJSONSchema(list.outputSchema!);
+
+    expect(listInput.properties?.application_id).toMatchObject({
+      description: 'Marketplace application ID owned by that account',
+    });
+    expect(replaceInput.properties?.frames).toMatchObject({
+      description: expect.stringContaining('Complete replacement set'),
+    });
+    expect(listOutput.properties?.data).toMatchObject({
+      description: 'Current declared entity iframe definitions',
+    });
+    expect(replace.destructive).toBe(true);
+    expect(replace.outputSchema).toBeDefined();
+    expect(toggle.outputSchema).toBeDefined();
   });
 
   test('entity frame replacement reads declarations back after applying', async () => {
@@ -177,6 +254,39 @@ describe('tool contracts', () => {
     expect(result).toMatchObject({
       verification: { effective_sidebar_frame_verified: false, outcome: 'unverified' },
     });
+    expect(target.destructive).toBe(true);
+    expect(target.outputSchema).toBeDefined();
+  });
+
+  test('sidebar frame removal requires an explicit remove confirmation', async () => {
+    const client = new FakeClient();
+    const target = buildTools(testConfig, client).find(
+      (item) => item.name === 'marketplace_install_sidebar_frame'
+    )!;
+    const input = {
+      mode: 'apply' as const,
+      partner_id: 3,
+      application_id: 7,
+      location_id: 55,
+      type: 'chat' as const,
+      url: null,
+    };
+
+    await expect(
+      target.handler({
+        ...input,
+        confirmation: 'INSTALL chat FRAME FOR APPLICATION 7 AT LOCATION 55',
+      })
+    ).rejects.toThrow('REMOVE chat FRAME FOR APPLICATION 7 AT LOCATION 55');
+    expect(client.calls).toHaveLength(0);
+
+    await target.handler({
+      ...input,
+      confirmation: 'REMOVE chat FRAME FOR APPLICATION 7 AT LOCATION 55',
+    });
+    expect(
+      client.calls.find((call) => call.path === '/marketplace/application/install_frame')
+    ).toMatchObject({ options: { body: { type: 'chat', url: null } } });
   });
 
   test('payment-link request includes the required tariff option', async () => {
