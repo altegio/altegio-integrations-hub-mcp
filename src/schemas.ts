@@ -67,8 +67,10 @@ const baseApplication = {
   trial_duration: z.number().int().nonnegative().describe('Free trial duration in days'),
   channels: z.array(positiveId).describe('Marketplace channel dictionary IDs'),
   permissions: z
-    .record(z.string().min(1), z.union([z.literal(0), z.literal(1)]))
-    .describe('Complete permission map keyed by current permission slug; values are 0 or 1'),
+    .record(z.string().min(1), z.number().int())
+    .describe(
+      'Complete permission map keyed by current permission slug; includes flags, IDs, and numeric day limits such as -1 for unlimited history'
+    ),
   callback_url: z
     .union([httpsUrl, z.literal('')])
     .default('')

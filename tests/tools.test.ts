@@ -78,7 +78,7 @@ describe('tool contracts', () => {
         price: '',
         trial_duration: 0,
         channels: [],
-        permissions: {},
+        permissions: { timetable_access: 1, last_days_count: -1 },
         callback_url: '',
         registration_redirect_url: '',
         is_personal_data_access_needed: false,
