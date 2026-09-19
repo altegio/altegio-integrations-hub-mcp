@@ -138,7 +138,7 @@ const frameMutationOutput = z
   .describe('Plan/apply mutation result');
 
 export function buildTools(config: Config, client = new MarketplaceClient(config)): ToolSpec[] {
-  const idempotency = new IdempotencyStore(config.MARKETPLACE_MCP_STATE_DIR);
+  const idempotency = new IdempotencyStore(config.INTEGRATIONS_HUB_MCP_STATE_DIR);
   const owned = (partnerId: number, applicationId: number): Promise<void> =>
     client.assertOwnsApplication(partnerId, applicationId);
   const partnerRead = async (
@@ -178,14 +178,14 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
 
   return [
     tool(
-      'marketplace_list_developer_accounts',
+      'integrations_hub_list_developer_accounts',
       'List developer accounts owned by the current Altegio user. Secret fields in partner-system metadata are redacted.',
       z.object({}).strict(),
       { readOnly: true },
       async () => client.request('/marketplace/developers/companies', { lane: 'user' })
     ),
     tool(
-      'marketplace_create_developer_account',
+      'integrations_hub_create_developer_account',
       'Plan or create a developer account. Any partner token returned upstream is redacted from the tool response.',
       z.object({ ...mutation, account: createAccountPayload }).strict(),
       {},
@@ -200,7 +200,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_update_developer_account',
+      'integrations_hub_update_developer_account',
       'Plan or replace developer-account details. Send the complete current account payload.',
       z.object({ ...mutation, partner_id: positiveId, account: accountPayload }).strict(),
       {},
@@ -214,7 +214,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_delete_developer_account',
+      'integrations_hub_delete_developer_account',
       'Delete a developer account. This is destructive and may orphan its management workflow.',
       z
         .object({ ...mutation, partner_id: positiveId, confirmation: z.string().optional() })
@@ -232,7 +232,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_list_applications',
+      'integrations_hub_list_applications',
       'List applications in a developer account, including card configuration, permissions, system-user ID, short links, and moderation state. Secret fields are redacted.',
       z.object({ partner_id: positiveId }).strict(),
       { readOnly: true },
@@ -242,7 +242,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
         })
     ),
     tool(
-      'marketplace_get_application',
+      'integrations_hub_get_application',
       'Get one owned application by filtering the authoritative developer-account application list.',
       z.object(partnerAndApp).strict(),
       { readOnly: true },
@@ -258,7 +258,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_get_catalog_metadata',
+      'integrations_hub_get_catalog_metadata',
       'Get current Marketplace categories, channels, functionalities, and the general country dictionary used by application/account country IDs.',
       z.object({}).strict(),
       { readOnly: true },
@@ -273,7 +273,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_list_available_rights',
+      'integrations_hub_list_available_rights',
       'Return the current hierarchical permission dictionary available to Marketplace system users.',
       z.object({ partner_id: positiveId }).strict(),
       { readOnly: true },
@@ -284,7 +284,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
         )
     ),
     tool(
-      'marketplace_create_application',
+      'integrations_hub_create_application',
       'Plan or create a draft Marketplace application. Creation is naturally idempotent by slug within the developer account.',
       z
         .object({ ...mutation, partner_id: positiveId, application: createApplicationPayload })
@@ -311,7 +311,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_update_application',
+      'integrations_hub_update_application',
       'Plan or replace the complete Marketplace card and technical settings. Apply requires exact confirmation because omitted collections are cleared.',
       z
         .object({
@@ -344,7 +344,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_save_moderation_instructions',
+      'integrations_hub_save_moderation_instructions',
       'Plan or save connection and payment instructions before submitting an application for moderation.',
       z
         .object({
@@ -374,7 +374,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_submit_for_moderation',
+      'integrations_hub_submit_for_moderation',
       'Plan or submit a fully configured application for Marketplace moderation.',
       z.object({ ...mutation, ...partnerAndApp, confirmation: z.string().optional() }).strict(),
       {},
@@ -390,7 +390,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_list_entity_frames',
+      'integrations_hub_list_entity_frames',
       'List declared employee/client/visit iframe definitions. Declarations are copied to a location only during a later application installation.',
       z.object(partnerAndApp).strict(),
       { readOnly: true, outputSchema: entityFrameListOutput },
@@ -403,7 +403,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_replace_entity_frames',
+      'integrations_hub_replace_entity_frames',
       'Plan or replace the full employee/client/visit declaration set. Omitted slugs are deleted. Existing installations are not updated or backfilled.',
       z
         .object({
@@ -447,7 +447,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_grant_location_access',
+      'integrations_hub_grant_location_access',
       'Plan or perform step 1 of installation: location owner grants access, producing pending (or immediate active for eligible draft/private apps). Apply requires exact confirmation.',
       z
         .object({
@@ -493,7 +493,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_activate_installation',
+      'integrations_hub_activate_installation',
       'Plan or perform step 2: activate a pending installation and configure entity webhooks/chat/tips/channels. Active state is treated idempotently.',
       z
         .object({
@@ -560,7 +560,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_get_installation_status',
+      'integrations_hub_get_installation_status',
       'Get status, payments, and status-transition log for an owned application at one location.',
       z.object({ ...partnerAndApp, location_id: positiveId }).strict(),
       { readOnly: true },
@@ -572,7 +572,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
         )
     ),
     tool(
-      'marketplace_list_installations',
+      'integrations_hub_list_installations',
       'List locations connected to an owned application, with bounded pagination.',
       z
         .object({
@@ -591,7 +591,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
         )
     ),
     tool(
-      'marketplace_uninstall',
+      'integrations_hub_uninstall',
       'Plan or uninstall an application from a location. Requires an exact confirmation phrase.',
       z
         .object({
@@ -620,7 +620,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_notify_chat_message',
+      'integrations_hub_notify_chat_message',
       'Signal a new chat message so Biz.ERP highlights the chat frame and may create notifications/leads according to location settings.',
       z
         .object({
@@ -652,7 +652,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_install_sidebar_frame',
+      'integrations_hub_install_sidebar_frame',
       'Install or remove an internal chat/waiting_list/task_tracker sidebar frame. These types are distinct from developer employee/client/visit frames.',
       z
         .object({
@@ -715,7 +715,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_toggle_sidebar_highlight',
+      'integrations_hub_toggle_sidebar_highlight',
       'Enable or clear the highlight on an already installed sidebar frame, optionally for one user.',
       z
         .object({
@@ -758,7 +758,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_list_tariffs',
+      'integrations_hub_list_tariffs',
       'List Marketplace billing tariffs and options for an owned application.',
       z.object(partnerAndApp).strict(),
       { readOnly: true },
@@ -770,7 +770,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
         )
     ),
     tool(
-      'marketplace_get_payment_link',
+      'integrations_hub_get_payment_link',
       'Generate an Altegio-hosted Marketplace payment link for an installed location.',
       z
         .object({
@@ -790,7 +790,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
         })
     ),
     tool(
-      'marketplace_record_payment',
+      'integrations_hub_record_payment',
       'Plan or record a successful external payment. This can unfreeze an installation. Requires a durable idempotency key and exact confirmation.',
       z
         .object({
@@ -851,7 +851,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_refund_payment',
+      'integrations_hub_refund_payment',
       'Plan or report a Marketplace payment refund. Requires an exact confirmation phrase.',
       z
         .object({
@@ -871,7 +871,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_set_discount',
+      'integrations_hub_set_discount',
       'Plan or set the Marketplace payment discount for selected locations.',
       z
         .object({
@@ -902,7 +902,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_update_notification_channel',
+      'integrations_hub_update_notification_channel',
       'Plan or update SMS/WhatsApp channel availability for a compatible installed application.',
       z
         .object({
@@ -933,7 +933,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_set_sms_sender_names',
+      'integrations_hub_set_sms_sender_names',
       'Plan or publish 1-20 SMS sender names for a compatible installed application.',
       z
         .object({
@@ -963,7 +963,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_get_statistics',
+      'integrations_hub_get_statistics',
       'Get owned-application views, pending grants, activations, new payments, and uninstalls for a date range.',
       z.object({ ...partnerAndApp, date_from: date, date_to: date }).strict(),
       { readOnly: true },
@@ -976,7 +976,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_get_conversion_statistics',
+      'integrations_hub_get_conversion_statistics',
       'Get application and category-average Marketplace funnel conversion series.',
       z
         .object({
@@ -1006,7 +1006,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_list_reviews',
+      'integrations_hub_list_reviews',
       'List public reviews for a Marketplace application.',
       z
         .object({ application_id: positiveId, page: z.number().int().positive().default(1) })
@@ -1019,7 +1019,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
         })
     ),
     tool(
-      'marketplace_validate_lifecycle_callback',
+      'integrations_hub_validate_lifecycle_callback',
       'Validate and normalize an uninstall/freeze/payment callback payload against the owned developer-account token without revealing it.',
       z
         .object({
@@ -1092,7 +1092,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_backoffice_get_application',
+      'integrations_hub_backoffice_get_application',
       'Read internal Marketplace backoffice data. This is not a public API and is disabled by default.',
       z.object({ application_id: positiveId }).strict(),
       { readOnly: true },
@@ -1104,7 +1104,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_backoffice_set_publication',
+      'integrations_hub_backoffice_set_publication',
       'Plan or set/clear the internal moderated_at publication timestamp. Internal API; disabled by default.',
       z
         .object({
@@ -1138,7 +1138,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_backoffice_set_commercials',
+      'integrations_hub_backoffice_set_commercials',
       'Plan or set internal commission/boost values. Internal API; disabled by default.',
       z
         .object({
@@ -1184,7 +1184,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_backoffice_delete_application',
+      'integrations_hub_backoffice_delete_application',
       'Delete an application and partner-linked entities through the internal backoffice API. Disabled by default and highly destructive.',
       z
         .object({ ...mutation, application_id: positiveId, confirmation: z.string().optional() })
@@ -1209,7 +1209,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_backoffice_list_offers',
+      'integrations_hub_backoffice_list_offers',
       'List internal Marketplace special offers. Internal API; disabled by default.',
       z.object({}).strict(),
       { readOnly: true },
@@ -1219,7 +1219,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_backoffice_upsert_offer',
+      'integrations_hub_backoffice_upsert_offer',
       'Plan or create/update an internal Marketplace special offer. Internal API; disabled by default.',
       z
         .object({
@@ -1248,7 +1248,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
       }
     ),
     tool(
-      'marketplace_backoffice_delete_offer',
+      'integrations_hub_backoffice_delete_offer',
       'Delete an internal Marketplace special offer. Internal API; disabled by default.',
       z.object({ ...mutation, offer_id: positiveId, confirmation: z.string().optional() }).strict(),
       { destructive: true },

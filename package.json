@@ -1,12 +1,12 @@
 {
-  "name": "@altegio/marketplace-mcp",
+  "name": "@altegio/integrations-hub-mcp",
   "version": "0.1.0",
-  "description": "MCP server for automated Altegio Marketplace application lifecycle management",
+  "description": "MCP server for automated Altegio Integrations Hub application lifecycle management",
   "type": "module",
   "private": true,
   "bin": {
-    "altegio-marketplace-mcp": "dist/index.js",
-    "altegio-marketplace-mcp-http": "dist/http-server.js"
+    "altegio-integrations-hub-mcp": "dist/index.js",
+    "altegio-integrations-hub-mcp-http": "dist/http-server.js"
   },
   "scripts": {
     "build": "tsc",

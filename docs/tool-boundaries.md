@@ -1,4 +1,4 @@
-# Marketplace tool boundaries
+# Integrations Hub tool boundaries
 
 Verified against Biz.ERP `6c25807e7c5` on 2026-09-12.
 

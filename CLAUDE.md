@@ -1,6 +1,6 @@
-# Altegio Marketplace MCP
+# Altegio Integrations Hub MCP
 
-TypeScript MCP server for Developer Cabinet and Marketplace partner APIs.
+TypeScript MCP server for the Altegio Integrations Hub, backed by Developer Cabinet and Marketplace partner APIs.
 
 ## Before changes
 

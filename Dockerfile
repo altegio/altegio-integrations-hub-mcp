@@ -14,7 +14,7 @@ COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 COPY --chown=nodejs:nodejs docs ./docs
 RUN mkdir /data && chown nodejs:nodejs /data
 USER nodejs
-ENV NODE_ENV=production PORT=8094 MARKETPLACE_MCP_STATE_DIR=/data
+ENV NODE_ENV=production PORT=8094 INTEGRATIONS_HUB_MCP_STATE_DIR=/data
 EXPOSE 8094
 VOLUME ["/data"]
 ENTRYPOINT ["dumb-init", "--"]

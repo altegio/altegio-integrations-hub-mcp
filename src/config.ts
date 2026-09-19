@@ -14,15 +14,19 @@ export const ConfigSchema = z.object({
   ALTEGIO_APP_BASE: z.string().url().default('https://app.alteg.io'),
   PORT: z.coerce.number().int().min(1).max(65535).default(8094),
   ALLOW_BACKOFFICE: booleanFlag,
-  MARKETPLACE_MCP_STATE_DIR: z.string().default('.marketplace-mcp'),
+  INTEGRATIONS_HUB_MCP_STATE_DIR: z.string().default('.integrations-hub-mcp'),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const parsed = ConfigSchema.parse(env);
+  const parsed = ConfigSchema.parse({
+    ...env,
+    INTEGRATIONS_HUB_MCP_STATE_DIR:
+      env.INTEGRATIONS_HUB_MCP_STATE_DIR ?? env.MARKETPLACE_MCP_STATE_DIR,
+  });
   return {
     ...parsed,
-    MARKETPLACE_MCP_STATE_DIR: resolve(parsed.MARKETPLACE_MCP_STATE_DIR),
+    INTEGRATIONS_HUB_MCP_STATE_DIR: resolve(parsed.INTEGRATIONS_HUB_MCP_STATE_DIR),
   };
 }
