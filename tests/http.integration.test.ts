@@ -32,7 +32,7 @@ describe('HTTP transport', () => {
       expect(response.status).toBe(200);
       const sessionId = response.headers.get('mcp-session-id');
       expect(sessionId).toBeTruthy();
-      expect(await response.text()).toContain('@altegio/marketplace-mcp');
+      expect(await response.text()).toContain('@altegio/integrations-hub-mcp');
 
       await fetch(`http://127.0.0.1:${port}/mcp`, {
         method: 'POST',
@@ -58,11 +58,11 @@ describe('HTTP transport', () => {
       });
       const toolList = await tools.text();
       expect(tools.status).toBe(200);
-      expect(toolList).toContain('marketplace_create_application');
-      expect(toolList).toContain('marketplace_validate_lifecycle_callback');
-      expect(toolList).toContain('marketplace_list_entity_frames');
-      expect(toolList).toContain('marketplace_replace_entity_frames');
-      expect(toolList).toContain('marketplace_install_sidebar_frame');
+      expect(toolList).toContain('integrations_hub_create_application');
+      expect(toolList).toContain('integrations_hub_validate_lifecycle_callback');
+      expect(toolList).toContain('integrations_hub_list_entity_frames');
+      expect(toolList).toContain('integrations_hub_replace_entity_frames');
+      expect(toolList).toContain('integrations_hub_install_sidebar_frame');
       expect(toolList).toContain('outputSchema');
     } finally {
       await new Promise<void>((resolve, reject) =>

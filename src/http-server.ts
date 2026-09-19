@@ -63,7 +63,7 @@ export function createApp(config: Config): { app: express.Express; transports: T
 export function start(config = loadConfig()): void {
   const { app } = createApp(config);
   app.listen(config.PORT, '0.0.0.0', () =>
-    process.stderr.write(`Altegio Marketplace MCP listening on ${config.PORT}\n`)
+    process.stderr.write(`Altegio Integrations Hub MCP listening on ${config.PORT}\n`)
   );
 }
 

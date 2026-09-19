@@ -24,24 +24,24 @@ const docsDirectory = resolve(currentDirectory, '..', 'docs');
 
 const resources = [
   {
-    uri: 'altegio://marketplace/internals',
-    name: 'marketplace_internals',
-    title: 'Marketplace internals guide',
+    uri: 'altegio://integrations-hub/internals',
+    name: 'integrations_hub_internals',
+    title: 'Integrations Hub internals guide',
     description:
       'Source-referenced Biz.ERP architecture, state machine, payloads, frames, callbacks, billing, caches, gates, and limitations.',
     file: 'marketplace-internals.md',
   },
   {
-    uri: 'altegio://marketplace/safe-e2e',
-    name: 'marketplace_safe_e2e',
+    uri: 'altegio://integrations-hub/safe-e2e',
+    name: 'integrations_hub_safe_e2e',
     title: 'Safe draft-to-install workflow',
     description:
       'A plan-first end-to-end recipe for creating, configuring, installing, activating, checking, updating, and uninstalling a draft.',
     file: 'safe-e2e.md',
   },
   {
-    uri: 'altegio://marketplace/tool-boundaries',
-    name: 'marketplace_tool_boundaries',
+    uri: 'altegio://integrations-hub/tool-boundaries',
+    name: 'integrations_hub_tool_boundaries',
     title: 'Tool and API boundaries',
     description:
       'Public, Developer Cabinet, restricted, and internal backoffice surface classification.',
@@ -69,7 +69,7 @@ function toTool(spec: ToolSpec): Tool {
 
 export function createServer(config: Config): Server {
   const server = new Server(
-    { name: '@altegio/marketplace-mcp', version: '0.1.0' },
+    { name: '@altegio/integrations-hub-mcp', version: '0.1.0' },
     {
       capabilities: {
         tools: { listChanged: false },
@@ -77,7 +77,7 @@ export function createServer(config: Config): Server {
         prompts: { listChanged: false },
       },
       instructions:
-        'Automate Altegio Marketplace application lifecycle. Start with read tools and mode=plan. Developer Cabinet operations use the caller Altegio token. Partner actions verify application ownership. Internal backoffice tools are disabled by default. Read altegio://marketplace/tool-boundaries before using restricted surfaces.',
+        'Automate the Altegio Integrations Hub application lifecycle. Start with read tools and mode=plan. Developer Cabinet operations use the caller Altegio token. Partner actions verify application ownership. Internal backoffice tools are disabled by default. Read altegio://integrations-hub/tool-boundaries before using restricted surfaces.',
     }
   );
   const specs = buildTools(config).sort((left, right) => left.name.localeCompare(right.name));
@@ -131,7 +131,7 @@ export function createServer(config: Config): Server {
   server.setRequestHandler(ListPromptsRequestSchema, async () => ({
     prompts: [
       {
-        name: 'marketplace_safe_draft_rollout',
+        name: 'integrations_hub_safe_draft_rollout',
         description:
           'Drive a safe draft application rollout with plan/apply checkpoints and final cleanup.',
         arguments: [
@@ -142,7 +142,7 @@ export function createServer(config: Config): Server {
     ],
   }));
   server.setRequestHandler(GetPromptRequestSchema, async (request) => {
-    if (request.params.name !== 'marketplace_safe_draft_rollout') {
+    if (request.params.name !== 'integrations_hub_safe_draft_rollout') {
       throw new McpError(ErrorCode.InvalidParams, `Unknown prompt: ${request.params.name}`);
     }
     const partnerId = request.params.arguments?.partner_id;
@@ -156,7 +156,7 @@ export function createServer(config: Config): Server {
           role: 'user',
           content: {
             type: 'text',
-            text: `Use developer account ${partnerId} and dedicated test location ${locationId}. Read altegio://marketplace/safe-e2e, inspect current accounts/metadata/rights, and run every mutation with mode=plan before mode=apply. Keep the app non-public/draft, request minimum permissions, verify pending/active state and callbacks, update one reversible field, verify again, then only uninstall if I explicitly provide the tool's exact confirmation phrase. Never invoke backoffice publication.`,
+            text: `Use developer account ${partnerId} and dedicated test location ${locationId}. Read altegio://integrations-hub/safe-e2e, inspect current accounts/metadata/rights, and run every mutation with mode=plan before mode=apply. Keep the app non-public/draft, request minimum permissions, verify pending/active state and callbacks, update one reversible field, verify again, then only uninstall if I explicitly provide the tool's exact confirmation phrase. Never invoke backoffice publication.`,
           },
         },
       ],

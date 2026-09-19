@@ -18,10 +18,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-      - run: docker build -t altegio-marketplace-mcp:ci .
+      - run: docker build -t altegio-integrations-hub-mcp:ci .
       - name: Container smoke
         run: |
-          docker run -d --rm --name marketplace-mcp -p 8094:8094 -e ALTEGIO_PARTNER_TOKEN=test altegio-marketplace-mcp:ci
+          docker run -d --rm --name integrations-hub-mcp -p 8094:8094 -e ALTEGIO_PARTNER_TOKEN=test altegio-integrations-hub-mcp:ci
           for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8094/health && exit 0; sleep 1; done
-          docker logs marketplace-mcp
+          docker logs integrations-hub-mcp
           exit 1

@@ -1,6 +1,6 @@
 # Biz.ERP Marketplace internals
 
-This is the implementation reference for projects integrating with Altegio Marketplace. It is intentionally dry: facts, contracts, limits, and source paths. Verified against Biz.ERP `c6a74fd7ea8` on 2026-09-19 and public API docs `1a60136b5`.
+This is the implementation reference for projects integrating with Altegio Integrations Hub. The underlying Biz.ERP module, routes, namespaces, tables, and DTOs retain their legacy Marketplace names. It is intentionally dry: facts, contracts, limits, and source paths. Verified against Biz.ERP `c6a74fd7ea8` on 2026-09-19 and public API docs `1a60136b5`.
 
 ## Architecture and ownership
 

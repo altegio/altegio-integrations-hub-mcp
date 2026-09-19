@@ -13,12 +13,12 @@ describe('tool contracts', () => {
     expect(tools.length).toBeGreaterThanOrEqual(30);
     expect(tools.map((item) => item.name)).toEqual(
       expect.arrayContaining([
-        'marketplace_create_application',
-        'marketplace_activate_installation',
-        'marketplace_record_payment',
-        'marketplace_get_statistics',
-        'marketplace_replace_entity_frames',
-        'marketplace_backoffice_set_publication',
+        'integrations_hub_create_application',
+        'integrations_hub_activate_installation',
+        'integrations_hub_record_payment',
+        'integrations_hub_get_statistics',
+        'integrations_hub_replace_entity_frames',
+        'integrations_hub_backoffice_set_publication',
       ])
     );
   });
@@ -26,7 +26,7 @@ describe('tool contracts', () => {
   test('plan mode performs no write', async () => {
     const client = new FakeClient();
     const target = buildTools(testConfig, client).find(
-      (item) => item.name === 'marketplace_create_developer_account'
+      (item) => item.name === 'integrations_hub_create_developer_account'
     )!;
     const result = await target.handler({
       mode: 'plan',
@@ -47,7 +47,7 @@ describe('tool contracts', () => {
   test('catalog metadata includes the country dictionary', async () => {
     const client = new FakeClient();
     const target = buildTools(testConfig, client).find(
-      (item) => item.name === 'marketplace_get_catalog_metadata'
+      (item) => item.name === 'integrations_hub_get_catalog_metadata'
     )!;
     await target.handler({});
     expect(client.calls.map((call) => call.path)).toEqual(
@@ -63,7 +63,7 @@ describe('tool contracts', () => {
   test('create application is idempotent by slug', async () => {
     const client = new FakeClient();
     const target = buildTools(testConfig, client).find(
-      (item) => item.name === 'marketplace_create_application'
+      (item) => item.name === 'integrations_hub_create_application'
     )!;
     const result = await target.handler({
       mode: 'apply',
@@ -95,7 +95,7 @@ describe('tool contracts', () => {
   test('application plan preserves embedded settings iframe configuration', async () => {
     const client = new FakeClient();
     const target = buildTools(testConfig, client).find(
-      (item) => item.name === 'marketplace_create_application'
+      (item) => item.name === 'integrations_hub_create_application'
     )!;
     const result = await target.handler({
       mode: 'plan',
@@ -132,7 +132,7 @@ describe('tool contracts', () => {
   test('partner activation uses normalized location input and legacy wire field', async () => {
     const client = new FakeClient();
     const target = buildTools(testConfig, client).find(
-      (item) => item.name === 'marketplace_activate_installation'
+      (item) => item.name === 'integrations_hub_activate_installation'
     )!;
     await target.handler({
       mode: 'apply',
@@ -149,7 +149,7 @@ describe('tool contracts', () => {
 
   test('entity frame replacement rejects duplicate slugs', async () => {
     const target = buildTools(testConfig, new FakeClient()).find(
-      (item) => item.name === 'marketplace_replace_entity_frames'
+      (item) => item.name === 'integrations_hub_replace_entity_frames'
     )!;
     await expect(
       target.handler({
@@ -167,7 +167,7 @@ describe('tool contracts', () => {
   test('entity frame listing uses the owned Developer Cabinet route', async () => {
     const client = new FakeClient();
     const target = buildTools(testConfig, client).find(
-      (item) => item.name === 'marketplace_list_entity_frames'
+      (item) => item.name === 'integrations_hub_list_entity_frames'
     )!;
 
     await target.handler({ partner_id: 3, application_id: 7 });
@@ -182,9 +182,9 @@ describe('tool contracts', () => {
 
   test('entity frame tools expose described input and output contracts', () => {
     const tools = buildTools(testConfig, new FakeClient());
-    const list = tools.find((item) => item.name === 'marketplace_list_entity_frames')!;
-    const replace = tools.find((item) => item.name === 'marketplace_replace_entity_frames')!;
-    const toggle = tools.find((item) => item.name === 'marketplace_toggle_sidebar_highlight')!;
+    const list = tools.find((item) => item.name === 'integrations_hub_list_entity_frames')!;
+    const replace = tools.find((item) => item.name === 'integrations_hub_replace_entity_frames')!;
+    const toggle = tools.find((item) => item.name === 'integrations_hub_toggle_sidebar_highlight')!;
     const listInput = z.toJSONSchema(list.schema);
     const replaceInput = z.toJSONSchema(replace.schema);
     const listOutput = z.toJSONSchema(list.outputSchema!);
@@ -211,7 +211,7 @@ describe('tool contracts', () => {
       data: [{ title: 'Employee', url: 'https://example.com/frame', slug: 'employee' }],
     });
     const target = buildTools(testConfig, client).find(
-      (item) => item.name === 'marketplace_replace_entity_frames'
+      (item) => item.name === 'integrations_hub_replace_entity_frames'
     )!;
     const result = await target.handler({
       mode: 'apply',
@@ -233,7 +233,7 @@ describe('tool contracts', () => {
   test('sidebar frame installation reports its effective result as unverified', async () => {
     const client = new FakeClient();
     const target = buildTools(testConfig, client).find(
-      (item) => item.name === 'marketplace_install_sidebar_frame'
+      (item) => item.name === 'integrations_hub_install_sidebar_frame'
     )!;
     const result = await target.handler({
       mode: 'apply',
@@ -261,7 +261,7 @@ describe('tool contracts', () => {
   test('sidebar frame removal requires an explicit remove confirmation', async () => {
     const client = new FakeClient();
     const target = buildTools(testConfig, client).find(
-      (item) => item.name === 'marketplace_install_sidebar_frame'
+      (item) => item.name === 'integrations_hub_install_sidebar_frame'
     )!;
     const input = {
       mode: 'apply' as const,
@@ -292,7 +292,7 @@ describe('tool contracts', () => {
   test('payment-link request includes the required tariff option', async () => {
     const client = new FakeClient();
     const target = buildTools(testConfig, client).find(
-      (item) => item.name === 'marketplace_get_payment_link'
+      (item) => item.name === 'integrations_hub_get_payment_link'
     )!;
     await target.handler({
       partner_id: 3,
@@ -311,7 +311,7 @@ describe('tool contracts', () => {
 
   test('lifecycle validation uses the owned developer-account token', async () => {
     const target = buildTools(testConfig, new FakeClient()).find(
-      (item) => item.name === 'marketplace_validate_lifecycle_callback'
+      (item) => item.name === 'integrations_hub_validate_lifecycle_callback'
     )!;
     await expect(
       target.handler({
@@ -328,7 +328,7 @@ describe('tool contracts', () => {
 
   test('payment lifecycle validation checks the documented HMAC payload', async () => {
     const target = buildTools(testConfig, new FakeClient()).find(
-      (item) => item.name === 'marketplace_validate_lifecycle_callback'
+      (item) => item.name === 'integrations_hub_validate_lifecycle_callback'
     )!;
     const sign = createHmac('sha256', 'owned-partner-token')
       .update('salon_id=55&amount=100&discount=5')
@@ -356,13 +356,13 @@ describe('tool contracts', () => {
   });
 
   test('concurrent payment retries apply once per durable idempotency key', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'marketplace-mcp-idempotency-'));
+    const directory = await mkdtemp(join(tmpdir(), 'integrations-hub-mcp-idempotency-'));
     try {
       const client = new FakeClient();
       const target = buildTools(
-        { ...testConfig, MARKETPLACE_MCP_STATE_DIR: directory },
+        { ...testConfig, INTEGRATIONS_HUB_MCP_STATE_DIR: directory },
         client
-      ).find((item) => item.name === 'marketplace_record_payment')!;
+      ).find((item) => item.name === 'integrations_hub_record_payment')!;
       const input = {
         mode: 'apply',
         partner_id: 3,
@@ -393,7 +393,7 @@ describe('tool contracts', () => {
 
   test('backoffice remains disabled by default', async () => {
     const target = buildTools(testConfig, new FakeClient()).find(
-      (item) => item.name === 'marketplace_backoffice_get_application'
+      (item) => item.name === 'integrations_hub_backoffice_get_application'
     )!;
     await expect(target.handler({ application_id: 7 })).rejects.toThrow('disabled');
   });

@@ -7,7 +7,7 @@ export const testConfig: Config = {
   ALTEGIO_APP_BASE: 'https://app.example.test',
   PORT: 8094,
   ALLOW_BACKOFFICE: false,
-  MARKETPLACE_MCP_STATE_DIR: '/tmp/altegio-marketplace-mcp-test-state',
+  INTEGRATIONS_HUB_MCP_STATE_DIR: '/tmp/altegio-integrations-hub-mcp-test-state',
 };
 
 export class FakeClient extends MarketplaceClient {
