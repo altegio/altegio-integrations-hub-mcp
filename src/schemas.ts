@@ -173,7 +173,11 @@ export const installationSettings = z
       .array(httpsUrl)
       .default([])
       .describe('Entity webhook receiver URLs installed for the location'),
-    chat_url: httpsUrl.optional().describe('Optional effective chat-frame base URL'),
+    chat_url: httpsUrl
+      .optional()
+      .describe(
+        'Optional journal sidebar chat-frame base URL. It is applied while the installation is still pending; an already-active installation rejects a repeat callback, so use install_sidebar_frame for it instead'
+      ),
     tips_url: httpsUrl.optional().describe('Optional tips integration URL'),
     channels: z
       .array(z.enum(['sms', 'whatsapp']))
