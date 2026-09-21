@@ -32,6 +32,14 @@ const resources = [
     file: 'marketplace-internals.md',
   },
   {
+    uri: 'altegio://integrations-hub/embedded-surfaces',
+    name: 'integrations_hub_embedded_surfaces',
+    title: 'Embedded UI surfaces',
+    description:
+      'Settings tab, journal sidebar panel and entity tabs: what each hand-off proves about the viewer, how to sign someone in without OAuth, iframe session and framing constraints, and how to edit a live application card.',
+    file: 'embedded-surfaces.md',
+  },
+  {
     uri: 'altegio://integrations-hub/safe-e2e',
     name: 'integrations_hub_safe_e2e',
     title: 'Safe draft-to-install workflow',

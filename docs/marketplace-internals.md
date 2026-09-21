@@ -4,7 +4,7 @@ This is the implementation reference for projects integrating with Altegio Integ
 
 This public MCP implements only application-owner and partner workflows. Upstream backoffice facts are retained here solely to explain the authorization boundary; Marketplace administrator actions belong in a separate moderator-only skill or service.
 
-Applications that deliver code into the booking widget — analytics counters, tag managers, and the unused `type='plugin'` application class — are covered separately in [widget-analytics-and-plugins.md](widget-analytics-and-plugins.md).
+Applications that deliver code into the booking widget — analytics counters, tag managers, and the unused `type='plugin'` application class — are covered separately in [widget-analytics-and-plugins.md](widget-analytics-and-plugins.md). Surfaces rendered inside the ERP — the Settings tab, the journal sidebar panel, entity tabs, and what each one proves about the person looking at it — are in [embedded-surfaces.md](embedded-surfaces.md), with production checks from 2026-09-21.
 
 ## Architecture and ownership
 
@@ -159,7 +159,11 @@ Request the minimum tree required by concrete Business Management API calls. App
 
 ## Settings iframe and redirects
 
-`registration_redirect_url` is opened after connect and from Settings. `is_iframe=true` embeds it in the application card; false opens it externally. The URL receives `salon_id` and, when personal-data transfer is enabled, optional encrypted `user_data` and `user_data_sign`.
+`registration_redirect_url` is opened after connect and from Settings. `is_iframe=true` embeds it in the application card; false opens it externally. With `is_iframe=true` the owner is also routed to that tab after Connect instead of a new browser tab, and the mass/group grant flows render their redirect in the same tab (`MarketplaceProductDefault.vue`). The URL receives `salon_id` (or `salon_ids` in the multi-location grant flow) and, when personal-data transfer is enabled, `user_data` and `user_data_sign`.
+
+`MarketplaceApplicationUniqueFieldsTransformer` rebuilds that URL per viewing user on every card open, so the card's URL is a per-request artifact, not the stored configuration value.
+
+Despite the name, `user_data` is **base64 of JSON, not ciphertext**: `UserDataEncryptor::encryptWithSign()` returns `base64($json)` and `hash_hmac('sha256', $json, <partner token>)`, and the AES path in the same class is not used here. The payload is `UserTransformer` plus the location title — `{id, name, phone, email, is_approved, avatar, salon_name}` — and carries no API token. The signature covers the payload only: `salon_id` on the same URL is unsigned, and the payload has no nonce or expiry. Verify the HMAC in constant time, then check the person against the location before trusting the pair; see [embedded-surfaces.md](embedded-surfaces.md).
 
 The Settings iframe has `clipboard-write`, no `sandbox`, fills the tab, and uses a fallback height for cross-origin content. Application to Biz.ERP messages:
 
@@ -212,7 +216,9 @@ Employee payload: ID and name parts. Client adds phone, birthdate, sex, comer. V
 
 ## Chat and sidebar frames
 
-For a normal new application, pass `chat_url` in the activation callback. `NotificationInstaller` creates/updates the chat frame directly rather than using the general frame installer. The effective base URL contains `salon_id` and legacy `hash`; timetable use adds `user_id` and `lang_id`, and appointment context adds client `phone`.
+For a normal new application, pass `chat_url` in the activation callback. `NotificationInstaller` creates/updates the chat frame directly rather than using the general frame installer. The effective base URL contains `salon_id` and legacy `hash`; timetable use adds `user_id` and `lang_id`, and appointment context adds client `phone`. `user_id` and `lang_id` are appended by the frontend and are not signed; only `hash` binds the URL to a location and to this application.
+
+`chat_url` only reaches an installation that is still `pending`. Confirming an already-active install is rejected (`403`, "The user has already installed this application" — checked in production on 2026-09-21), so an existing install takes the panel through `install_frame` instead.
 
 Chat visibility requires `hasChatAccess`: explicit backoffice access or the relevant timetable phone + appointment client permissions. `POST /marketplace/application/new_message` sets unread/highlight state, publishes a socket update, and may add notification-center entries. If the location enables lead saving, a message from an unknown phone may create a lead. Location users control push and lead-saving settings.
 
@@ -225,7 +231,7 @@ POST /marketplace/application/install_frame
 POST /marketplace/application/toggle_highlight
 ```
 
-Types are `chat`, `waiting_list`, `task_tracker`; do not confuse them with developer `employee/client/visit` frames. Ownership and active installation are checked. The rollout release removes the historical application allowlist and Altegio/YCLIENTS frontend brand gates. Frame-limit exhaustion logs `Frames limit reached` but can return success-like output without a row. The partner API has no effective-frame read endpoint, so the MCP reports the result as unverified rather than claiming creation.
+Types are `chat`, `waiting_list`, `task_tracker`; do not confuse them with developer `employee/client/visit` frames. Ownership and active installation are checked. The historical application allowlist (`isAppFrameValidated`: 186/121/39) and the eight-location test list are gone from `MarketplaceFramesService` on `master`, and production behaves that way: on 2026-09-21 an ordinary unmoderated application installed a `chat` frame for a location outside both lists and the row appeared in `marketplace_sidebar_frame_urls`. Frame-limit exhaustion still logs `Frames limit reached` and can return success-like output without a row, and the partner API has no effective-frame read endpoint, so the MCP reports the result as unverified rather than claiming creation. The installation status is not that read endpoint either: `special_settings.chat_url` stays `null` for a frame installed this way because it belongs to the install callback's stored settings, a different table.
 
 ## Webhooks and lifecycle callbacks
 
@@ -284,13 +290,15 @@ Developer frame declaration save does not invalidate or rewrite already material
 
 ## Rollout gates and known limitations
 
-- Entity frames require the backend/frontend rollout release; declarations saved before it remain inert until a new installation.
-- Waiting list/task tracker require the frontend rollout release that removes the historical brand gate; they remain internal sidebar types.
+- Entity frames: the code gates are removed on `master` and the declarations endpoint answers in production (`200`, empty set for a fresh application), but no `employee`/`client`/`visit` tab has been confirmed in a production UI. Declarations saved before an installation remain inert until a new installation copies them.
+- Sidebar frames: the application allowlist is gone in production (checked 2026-09-21). Waiting list/task tracker remain internal sidebar types, historically brand-gated in the frontend.
 - Chat: usable through activation callback, but one shared slot per location.
 - Arbitrary iframe types or main-menu items: no configuration extension point found.
 - Schedule webhook: setting is not propagated into actual webhook DTO.
 - Marketplace callback lifecycle is production-only.
-- Iframes have no sandbox. Entity-frame postMessage is strict-origin; the separate Settings channel does not validate origin on the host side.
+- Iframes have no sandbox. Entity-frame postMessage is strict-origin; the separate Settings channel does not validate origin on the host side, so the embedded page must check `event.origin` itself.
+- An embedded surface cannot rely on cookies: a cross-site iframe is not sent a `SameSite=Lax` cookie and third-party cookies are blocked in some browsers. Carry the session in the rendered document instead, and allow framing with CSP `frame-ancestors` — `X-Frame-Options` cannot express an allowlist.
+- Application update is full replacement: omitted fields are cleared, `icon` must be omitted to keep the current one, and `status` is accepted by the DTO but never read by the update service.
 - Public v3 is future-facing; this implementation uses v1/v2 wire contracts.
 - Internal Developer Cabinet APIs may change with the first-party frontend. Keep them behind adapters and contract tests; do not add backoffice routes to this public server.
 - `is_push_enabled` defaults differ between DB (0) and model (1); explicitly saving the setting removes ambiguity.

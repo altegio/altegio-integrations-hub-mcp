@@ -88,11 +88,13 @@ Live mutation tests are intentionally not part of CI because they would create M
 ## Known platform limits
 
 - Normal partner API has no direct freeze/unfreeze command. Expiry freezes; a valid payment may unfreeze.
-- Entity-frame rollout requires the Biz.ERP backend/frontend release that removes the historical application/location and frontend gates. Saving declarations never backfills existing installations.
+- Saving entity-frame declarations never backfills existing installations; a location copies them at install time. The code gates are gone on Biz.ERP `master` and the declarations endpoint answers in production, but no entity tab has been confirmed in a production UI.
 - Entity frame URLs are origin-bound: redirects to a different origin break `postMessage`. Per-location limits are global across applications: employee 1, client 1, visit 5.
 - Developer entity frames (`employee/client/visit`) and internal sidebar frames (`chat/waiting_list/task_tracker`) are separate systems.
-- Chat through activation is usable but one effective chat slot exists per location.
+- Chat through activation is usable but one effective chat slot exists per location, and `chat_url` only applies while the installation is pending: an active one rejects a repeat callback, so its panel is set through `install_sidebar_frame` (the sidebar application allowlist is gone in production).
+- The settings-iframe hand-off `user_data` is base64 JSON, not ciphertext; `user_data_sign` is its HMAC-SHA256 under the partner token, and `salon_id` beside it is unsigned.
+- An embedded surface cannot use cookies (cross-site iframe); carry the session in the rendered document and allow framing with CSP `frame-ancestors`.
 - Schedule webhook configuration is not propagated into the installed webhook DTO.
 - Lifecycle callback URLs must target the application's backend, not this OAuth-protected MCP endpoint.
 
-Read [docs/marketplace-internals.md](docs/marketplace-internals.md) before adding or changing operations. For applications that deliver code into the booking widget — analytics counters, tag managers, booking-form injections, and the dormant `type='plugin'` application class — read [docs/widget-analytics-and-plugins.md](docs/widget-analytics-and-plugins.md).
+Read [docs/marketplace-internals.md](docs/marketplace-internals.md) before adding or changing operations. For applications that deliver code into the booking widget — analytics counters, tag managers, booking-form injections, and the dormant `type='plugin'` application class — read [docs/widget-analytics-and-plugins.md](docs/widget-analytics-and-plugins.md). For surfaces rendered inside the ERP — the Settings tab, the journal sidebar panel, entity tabs, signing a person in without OAuth, and editing a live application card — read [docs/embedded-surfaces.md](docs/embedded-surfaces.md).

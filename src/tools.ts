@@ -652,7 +652,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
     ),
     tool(
       'integrations_hub_install_sidebar_frame',
-      'Install or remove an internal chat/waiting_list/task_tracker sidebar frame. These types are distinct from developer employee/client/visit frames.',
+      'Install or remove an internal chat/waiting_list/task_tracker sidebar frame. These types are distinct from developer employee/client/visit frames. This is also the way to set a chat frame on an installation that is already active, where a repeat activation callback is rejected.',
       z
         .object({
           ...mutation,
@@ -690,7 +690,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
             'POST',
             path,
             body,
-            `Internal sidebar operation; do not use this tool for employee/client/visit developer frames. A success response does not guarantee creation when a location-wide limit is exhausted. Apply requires: ${confirmationPhrase}`
+            `Internal sidebar operation; do not use this tool for employee/client/visit developer frames. A success response does not guarantee creation when a location-wide limit is exhausted, and the installation status keeps reporting chat_url as null because that field belongs to the activation settings rather than the frame row. Apply requires: ${confirmationPhrase}`
           );
         requireConfirmation(confirmation, confirmationPhrase);
         const write = await partnerWrite(partner_id, application_id, path, body);
