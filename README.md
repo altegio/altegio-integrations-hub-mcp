@@ -49,6 +49,16 @@ INTEGRATIONS_HUB_MCP_STATE_DIR=.integrations-hub-mcp
 
 The public platform route authenticates through Altegio OAuth/raw token and forwards the current user token as `X-Altegio-User-Token`. `ALTEGIO_USER_TOKEN` is only for a private local stdio process.
 
+## Media assets
+
+The MCP does not generate logos, covers, screenshots, or videos. Generate or prepare those assets with a separate image/video tool, then include them in the full application update:
+
+- `icon`: pass a `data:image/...;base64,...` data URL to upload a new icon into Marketplace storage. Omit `icon` when the current icon should remain unchanged; the hosted icon URL returned by a read is not a valid icon upload payload.
+- `promo_materials` with `type: image`: pass a base64 image data URL to upload a new image, or preserve an existing Marketplace-hosted image URL/path returned by the application read.
+- `promo_materials` with `type: video`: pass the video reference or URL. This application endpoint does not upload video bytes.
+
+`integrations_hub_update_application` remains a full replacement. Read the application first and preserve the complete `promo_materials` list, because omitted materials are deleted. The MCP intentionally does not expose the unrelated generic multipart `/image/upload` route or provide general-purpose asset hosting.
+
 ## Run locally
 
 Node 22.23.2 is pinned.
