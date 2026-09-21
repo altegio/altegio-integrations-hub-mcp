@@ -57,7 +57,13 @@ export const accountPayload = z
 const baseApplication = {
   title: z.string().min(3).describe('Marketplace application title'),
   short_description: z.string().min(3).describe('Short catalogue-card description'),
-  icon: z.string().nullable().optional().describe('Developer Cabinet icon value'),
+  icon: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      'New icon as a data:image/...;base64 data URL. Biz.ERP uploads it to Marketplace storage. Omit this field to keep the current icon; do not round-trip the hosted icon URL returned by reads.'
+    ),
   category_id: positiveId.describe('Marketplace category ID'),
   country_ids: z.array(positiveId).min(1).describe('Country IDs where the app is available'),
   website_url: z
@@ -117,7 +123,17 @@ export const updateApplicationPayload = z
     full_description: z.string().default('').describe('Full catalogue description'),
     features_description: z.array(z.string()).describe('Feature description paragraphs'),
     promo_materials: z.array(
-      z.object({ type: z.enum(['image', 'video']), content: z.string().min(1) }).strict()
+      z
+        .object({
+          type: z.enum(['image', 'video']),
+          content: z
+            .string()
+            .min(1)
+            .describe(
+              'For image, a data:image/...;base64 data URL uploads a new asset and an existing Marketplace image URL/path is preserved. For video, provide the video reference or URL; Biz.ERP does not upload video bytes here.'
+            ),
+        })
+        .strict()
     ),
     questions: z.array(
       z
