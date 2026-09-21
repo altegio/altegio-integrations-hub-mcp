@@ -4,6 +4,8 @@ This is the implementation reference for projects integrating with Altegio Integ
 
 This public MCP implements only application-owner and partner workflows. Upstream backoffice facts are retained here solely to explain the authorization boundary; Marketplace administrator actions belong in a separate moderator-only skill or service.
 
+Applications that deliver code into the booking widget — analytics counters, tag managers, and the unused `type='plugin'` application class — are covered separately in [widget-analytics-and-plugins.md](widget-analytics-and-plugins.md).
+
 ## Architecture and ownership
 
 Marketplace is a Biz.ERP module, not a separate service. Its HTTP surface is split between:

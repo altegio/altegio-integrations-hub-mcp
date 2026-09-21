@@ -95,4 +95,4 @@ Live mutation tests are intentionally not part of CI because they would create M
 - Schedule webhook configuration is not propagated into the installed webhook DTO.
 - Lifecycle callback URLs must target the application's backend, not this OAuth-protected MCP endpoint.
 
-Read [docs/marketplace-internals.md](docs/marketplace-internals.md) before adding or changing operations.
+Read [docs/marketplace-internals.md](docs/marketplace-internals.md) before adding or changing operations. For applications that deliver code into the booking widget — analytics counters, tag managers, booking-form injections, and the dormant `type='plugin'` application class — read [docs/widget-analytics-and-plugins.md](docs/widget-analytics-and-plugins.md).
