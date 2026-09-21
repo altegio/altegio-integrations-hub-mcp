@@ -53,7 +53,7 @@ The public platform route authenticates through Altegio OAuth/raw token and forw
 
 The MCP does not generate logos, covers, screenshots, or videos. Generate or prepare those assets with a separate image/video tool, then include them in the full application update:
 
-- `icon`: pass a `data:image/...;base64,...` data URL to upload a new icon into Marketplace storage. Omit `icon` when the current icon should remain unchanged; the hosted icon URL returned by a read is not a valid icon upload payload.
+- `icon`: pass a `data:image/...;base64,...` data URL to upload a new icon into Marketplace storage. Omit `icon` when the current icon should remain unchanged. Any other string is rejected by the schema: Biz.ERP stores the decoded bytes verbatim without validating them as an image, so round-tripping the hosted icon URL returned by a read silently replaces the icon with a corrupt file.
 - `promo_materials` with `type: image`: pass a base64 image data URL to upload a new image, or preserve an existing Marketplace-hosted image URL/path returned by the application read.
 - `promo_materials` with `type: video`: pass the video reference or URL. This application endpoint does not upload video bytes.
 

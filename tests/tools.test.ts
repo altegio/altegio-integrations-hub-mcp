@@ -98,6 +98,46 @@ describe('tool contracts', () => {
     expect(parsed.success).toBe(true);
   });
 
+  test('icon accepts a base64 data URL and rejects a hosted icon URL', () => {
+    const target = buildTools(testConfig, new FakeClient()).find(
+      (item) => item.name === 'integrations_hub_create_application'
+    )!;
+    const application = {
+      title: 'Existing app',
+      short_description: 'Existing app',
+      category_id: 1,
+      country_ids: [1],
+      website_url: 'https://example.com',
+      price: '',
+      trial_duration: 0,
+      channels: [],
+      permissions: {},
+      callback_url: '',
+      registration_redirect_url: '',
+      is_personal_data_access_needed: false,
+      is_multiple_salons_allowed: false,
+      is_iframe: false,
+      slug: 'existing_app',
+      is_nonpublic: false,
+      monetization_type: 'free',
+    };
+    const base = { mode: 'plan', partner_id: 3 };
+
+    expect(
+      target.schema.safeParse({
+        ...base,
+        application: { ...application, icon: 'data:image/png;base64,iVBORw0KGgo=' },
+      }).success
+    ).toBe(true);
+    expect(target.schema.safeParse({ ...base, application }).success).toBe(true);
+    expect(
+      target.schema.safeParse({
+        ...base,
+        application: { ...application, icon: 'https://assets.alteg.io/marketplace/a/ad/icon.png' },
+      }).success
+    ).toBe(false);
+  });
+
   test('create application is idempotent by slug', async () => {
     const client = new FakeClient();
     const target = buildTools(testConfig, client).find(

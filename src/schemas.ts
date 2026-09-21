@@ -20,6 +20,14 @@ export const httpsUrl = z
   })
   .describe('Absolute HTTPS URL');
 
+export const base64ImageDataUrl = z
+  .string()
+  .regex(/^data:image\/[-+.\w]+;(?:name=[^;]+;)?base64,[A-Za-z0-9+/]+={0,2}$/i, {
+    message:
+      'Icon must be a data:image/...;base64 data URL. Biz.ERP stores the decoded bytes verbatim, so any other string (including the hosted icon URL returned by a read) is written as a corrupt image file. Omit the field to keep the current icon.',
+  })
+  .describe('Base64 image data URL');
+
 const baseAccount = {
   title: z.string().min(1).describe('Developer account display title'),
   description: z.string().min(1).describe('Developer or company description'),
@@ -57,12 +65,11 @@ export const accountPayload = z
 const baseApplication = {
   title: z.string().min(3).describe('Marketplace application title'),
   short_description: z.string().min(3).describe('Short catalogue-card description'),
-  icon: z
-    .string()
+  icon: base64ImageDataUrl
     .nullable()
     .optional()
     .describe(
-      'New icon as a data:image/...;base64 data URL. Biz.ERP uploads it to Marketplace storage. Omit this field to keep the current icon; do not round-trip the hosted icon URL returned by reads.'
+      'New icon as a data:image/...;base64 data URL. Biz.ERP uploads it to Marketplace storage. Omit this field to keep the current icon; the hosted icon URL returned by reads is rejected because Biz.ERP would store its decoded bytes as a corrupt image.'
     ),
   category_id: positiveId.describe('Marketplace category ID'),
   country_ids: z.array(positiveId).min(1).describe('Country IDs where the app is available'),
