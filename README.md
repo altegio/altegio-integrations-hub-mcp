@@ -7,7 +7,31 @@ Public-zone MCP server for robotized creation, configuration, rollout, operation
 
 Marketplace administration is intentionally excluded. Moderation decisions, publication, ranking, commissions, application removal by moderators, and special-offer management belong in a separate moderator-only skill or service.
 
-Production endpoint after the platform MR is deployed: `https://mcp.alteg.io/public/integrations-hub/mcp`.
+**Hosted MCP address:** `https://mcp.alteg.io/integrations-hub`.
+This is the address to paste into a remote MCP client. The platform also accepts
+the older `/public/integrations-hub/mcp` path as an alias.
+
+## Connect in minutes
+
+Use the [one-click connection guide](https://mcp.alteg.io/connect/integrations-hub)
+for Claude, Cursor, VS Code, Codex, Gemini CLI, or ChatGPT. Sign in with the
+Altegio account that owns your developer applications. The hosted route does
+not require you to run this repository or paste a Partner Token into the client.
+
+For Claude Code:
+
+```bash
+claude mcp add --transport http altegio-integrations-hub https://mcp.alteg.io/integrations-hub
+```
+
+Then run `/mcp` and choose **Authenticate**. Start by listing your developer
+accounts and asking the assistant to read the safe rollout resource and plan a
+private draft before applying any write.
+
+See the [developer landing page](https://developer.alteg.io/en/developers/integrations-hub-mcp.md)
+for capabilities and more connection options, or the
+[Developer Tools API](https://developer.alteg.io/en/developers/openapi.yaml)
+if you prefer direct REST calls.
 
 ## What it covers
 
