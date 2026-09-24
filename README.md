@@ -35,7 +35,7 @@ if you prefer direct REST calls.
 
 ## What it covers
 
-The server exposes 33 owner-facing tools:
+The server exposes 35 owner-facing tools:
 
 - Developer accounts: `integrations_hub_list_developer_accounts`, `integrations_hub_create_developer_account`, `integrations_hub_update_developer_account`, `integrations_hub_delete_developer_account`.
 - Applications/card: `integrations_hub_list_applications`, `integrations_hub_get_application`, `integrations_hub_get_catalog_metadata`, `integrations_hub_list_available_rights`, `integrations_hub_create_application`, `integrations_hub_update_application`.
@@ -45,12 +45,14 @@ The server exposes 33 owner-facing tools:
 - Billing/notifications: `integrations_hub_list_tariffs`, `integrations_hub_get_payment_link`, `integrations_hub_record_payment`, `integrations_hub_refund_payment`, `integrations_hub_set_discount`, `integrations_hub_update_notification_channel`, `integrations_hub_set_sms_sender_names`.
 - Analytics: `integrations_hub_get_statistics`, `integrations_hub_get_conversion_statistics`, `integrations_hub_list_reviews`.
 - Lifecycle: `integrations_hub_validate_lifecycle_callback`.
+- Webhooks: `integrations_hub_get_location_webhooks`, `integrations_hub_change_location_webhooks` (location-wide entity hooks). Read and update the separate application lifecycle `callback_url` through the application tools.
 
 MCP resources:
 
 - `altegio://integrations-hub/internals` — the complete source-referenced Biz.ERP implementation guide;
 - `altegio://integrations-hub/safe-e2e` — draft → configure → install → activate → verify → update → uninstall;
 - `altegio://integrations-hub/tool-boundaries` — public/internal classifications and safety rules.
+- `altegio://integrations-hub/webhooks` — entity and lifecycle event contracts, safe settings changes, and delivery limits.
 
 Prompt: `integrations_hub_safe_draft_rollout`.
 
@@ -119,6 +121,7 @@ Live mutation tests are intentionally not part of CI because they would create M
 - The settings-iframe hand-off `user_data` is base64 JSON, not ciphertext; `user_data_sign` is its HMAC-SHA256 under the partner token, and `salon_id` beside it is unsigned.
 - An embedded surface cannot use cookies (cross-site iframe); carry the session in the rendered document and allow framing with CSP `frame-ancestors`.
 - Schedule webhook configuration is not propagated into the installed webhook DTO.
+- The legacy location hooks POST replaces every URL and all event flags. Its GET omits product and self-sending, and reports only the first URL's flags. Use the webhook resource and review the full plan before changing it; there is no owner delivery-log/replay/test API.
 - Lifecycle callback URLs must target the application's backend, not this OAuth-protected MCP endpoint.
 
 Read [docs/marketplace-internals.md](docs/marketplace-internals.md) before adding or changing operations. For applications that deliver code into the booking widget — analytics counters, tag managers, booking-form injections, and the dormant `type='plugin'` application class — read [docs/widget-analytics-and-plugins.md](docs/widget-analytics-and-plugins.md). For surfaces rendered inside the ERP — the Settings tab, the journal sidebar panel, entity tabs, signing a person in without OAuth, and editing a live application card — read [docs/embedded-surfaces.md](docs/embedded-surfaces.md).

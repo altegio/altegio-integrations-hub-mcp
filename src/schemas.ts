@@ -171,6 +171,10 @@ export const installationSettings = z
   .object({
     webhook_urls: z
       .array(httpsUrl)
+      .max(10)
+      .refine((urls) => new Set(urls).size === urls.length, {
+        message: 'Webhook destination URLs must be unique',
+      })
       .default([])
       .describe('Entity webhook receiver URLs installed for the location'),
     chat_url: httpsUrl
