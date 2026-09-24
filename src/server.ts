@@ -24,6 +24,14 @@ const docsDirectory = resolve(currentDirectory, '..', 'docs');
 
 const resources = [
   {
+    uri: 'altegio://integrations-hub/webhooks',
+    name: 'integrations_hub_webhooks',
+    title: 'Owner webhook management',
+    description:
+      'Location entity subscriptions, application lifecycle callbacks, payload semantics, safety limits, and delivery diagnosis.',
+    file: 'webhooks.md',
+  },
+  {
     uri: 'altegio://integrations-hub/internals',
     name: 'integrations_hub_internals',
     title: 'Integrations Hub internals guide',

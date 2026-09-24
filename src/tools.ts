@@ -5,6 +5,7 @@ import { MarketplaceClient } from './client.js';
 import { IdempotencyStore } from './idempotency.js';
 import { MarketplaceError } from './errors.js';
 import { planned, requireConfirmation } from './safety.js';
+import { eventFields, parseHookSettings, planHookChange, webhookChange } from './webhooks.js';
 import {
   accountPayload,
   createAccountPayload,
@@ -176,6 +177,95 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
   const mutation = { mode };
 
   return [
+    tool(
+      'integrations_hub_get_location_webhooks',
+      'Read location-wide entity webhook destinations and event flags for a location accessible to the caller. The application ID checks developer ownership; the location API enforces user permissions. Product and self-sending cannot be read upstream.',
+      z.object({ ...partnerAndApp, location_id: positiveId }).strict(),
+      { readOnly: true },
+      async ({ partner_id, application_id, location_id }) => {
+        await owned(partner_id, application_id);
+        return parseHookSettings(
+          await client.request(`/hooks_settings/${location_id}`, { lane: 'user' })
+        );
+      }
+    ),
+    tool(
+      'integrations_hub_change_location_webhooks',
+      'Plan or change the location-wide entity hook list and shared event selection. This legacy POST replaces the whole list and applies one selection to every URL. Supply the unreadable product and self-sending values explicitly. Apply requires the plan snapshot and exact confirmation.',
+      z
+        .object({
+          ...mutation,
+          ...partnerAndApp,
+          location_id: positiveId,
+          change: webhookChange,
+          expected_snapshot: z
+            .string()
+            .regex(/^[a-f0-9]{64}$/)
+            .optional(),
+          confirmation: z.string().optional(),
+        })
+        .strict(),
+      { destructive: true },
+      async ({
+        mode: applyMode,
+        partner_id,
+        application_id,
+        location_id,
+        change,
+        expected_snapshot,
+        confirmation,
+      }) => {
+        await owned(partner_id, application_id);
+        const path = `/hooks_settings/${location_id}`;
+        const current = parseHookSettings(await client.request(path, { lane: 'user' }));
+        const body = planHookChange(current, change);
+        const phrase = `CHANGE LOCATION ${location_id} WEBHOOKS`;
+        if (applyMode === 'plan') {
+          return {
+            ...pathPlan(
+              'change_location_webhooks',
+              'POST',
+              path,
+              body,
+              `Location-wide replacement; all destinations receive identical event flags. Upstream GET omits product and self-sending, so verify the supplied values. Apply requires: ${phrase}`
+            ),
+            expected_snapshot: current.snapshot,
+            current,
+          };
+        }
+        if (!expected_snapshot || current.snapshot !== expected_snapshot) {
+          throw new MarketplaceError(
+            'Webhook settings changed since planning. Read and plan again.',
+            409
+          );
+        }
+        requireConfirmation(confirmation, phrase);
+        await client.request(path, { method: 'POST', lane: 'user', body });
+        const verified = parseHookSettings(await client.request(path, { lane: 'user' }));
+        const visibleEventMismatch = Object.entries(verified.events).some(([name, enabled]) => {
+          if (name === 'product') return false;
+          const field = eventFields[name as keyof typeof eventFields];
+          return Number(enabled) !== body[field];
+        });
+        if (
+          JSON.stringify([...verified.urls].sort()) !==
+            JSON.stringify([...(body.urls as string[])].sort()) ||
+          verified.active !== body.active ||
+          visibleEventMismatch
+        ) {
+          throw new MarketplaceError(
+            'Webhook settings write returned, but read-back did not match visible settings.',
+            502
+          );
+        }
+        return {
+          ok: true,
+          applied: true,
+          operation: 'change_location_webhooks',
+          verification: verified,
+        };
+      }
+    ),
     tool(
       'integrations_hub_list_developer_accounts',
       'List developer accounts owned by the current Altegio user. Secret fields in partner-system metadata are redacted.',
