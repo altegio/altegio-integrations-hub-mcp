@@ -235,9 +235,9 @@ Types are `chat`, `waiting_list`, `task_tracker`; do not confuse them with devel
 
 ## Webhooks and lifecycle callbacks
 
-Activation `webhook_urls` registers the standard entity set enabled in `MarketplaceApplicationHookSettings`: location, team member, product, service, service category, client, appointment, goods sale/receipt/consumption/theft/move, and finance operation. Wire event naming follows the existing webhook subsystem. Always perform an initial API backfill; webhooks are incremental notification, not a snapshot or exactly-once queue.
+Activation `webhook_urls` registers the standard entity set enabled in `MarketplaceApplicationHookSettings`: location, team member, product, service, service category, client, appointment, schedule updates, goods sale/receipt/consumption/theft/move, and finance operation. Wire event naming follows the existing webhook subsystem. Always perform an initial API backfill; webhooks are incremental notification, not a snapshot or exactly-once queue.
 
-The schedule flag exists in Marketplace hook settings, but `MarketplaceInstallerHelper::createWebhookDtoForMarketplaceApplication()` does not copy it into `WebHookDto`. Do not claim schedule webhook support without a Biz.ERP change and contract test.
+Backend MR !22922 copies the schedule flag into the installed `WebHookDto` and emits `resource: schedule`, `status: update`, empty `data` when a team member's schedule changes. Existing installations retain their stored settings until updated or reinstalled. Location settings GET reports each URL's flags in `url_settings`; POST still replaces the entire location URL set and applies one flag set to all of them.
 
 `callback_url` receives production-only lifecycle events `uninstall`, `freeze`, and `payment`. Common fields are `salon_id`, `application_id`, `event`, `partner_token`; payment adds payment/period data. Validate the partner token with constant-time comparison in the application backend, return 2xx quickly, deduplicate, and process asynchronously. This is distinct from entity `webhook_urls`.
 
@@ -294,7 +294,7 @@ Developer frame declaration save does not invalidate or rewrite already material
 - Sidebar frames: the application allowlist is gone in production (checked 2026-09-21). Waiting list/task tracker remain internal sidebar types, historically brand-gated in the frontend.
 - Chat: usable through activation callback, but one shared slot per location.
 - Arbitrary iframe types or main-menu items: no configuration extension point found.
-- Schedule webhook: setting is not propagated into actual webhook DTO.
+- Schedule updates are supported after backend MR !22922 is deployed; existing installations need their stored settings refreshed.
 - Marketplace callback lifecycle is production-only.
 - Iframes have no sandbox. Entity-frame postMessage is strict-origin; the separate Settings channel does not validate origin on the host side, so the embedded page must check `event.origin` itself.
 - An embedded surface cannot rely on cookies: a cross-site iframe is not sent a `SameSite=Lax` cookie and third-party cookies are blocked in some browsers. Carry the session in the rendered document instead, and allow framing with CSP `frame-ancestors` — `X-Frame-Options` cannot express an allowlist.
