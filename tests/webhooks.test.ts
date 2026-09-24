@@ -1,4 +1,5 @@
 import { buildTools } from '../src/tools.js';
+import { installationSettings } from '../src/schemas.js';
 import { eventFields, parseHookSettings, planHookChange } from '../src/webhooks.js';
 import { FakeClient, testConfig } from './helpers.js';
 
@@ -30,6 +31,18 @@ const change = {
 };
 
 describe('location webhooks', () => {
+  test('activation rejects destination lists that the location API cannot manage', () => {
+    expect(
+      installationSettings.safeParse({
+        webhook_urls: Array.from({ length: 11 }, (_, i) => `https://example.com/${i}`),
+      }).success
+    ).toBe(false);
+    expect(
+      installationSettings.safeParse({
+        webhook_urls: ['https://example.com/hook', 'https://example.com/hook'],
+      }).success
+    ).toBe(false);
+  });
   test('canonical read shows gaps in upstream settings and a stable snapshot', async () => {
     const client = new FakeClient();
     client.responses.set('/hooks_settings/55', { success: true, data: settings });
