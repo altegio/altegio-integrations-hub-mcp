@@ -240,6 +240,62 @@ describe('location webhooks', () => {
     expect(hookSettingsMatchBody(allSaved, body)).toBe(true);
   });
 
+  test('apply verifies every URL against the complete backend read-back', async () => {
+    class CompleteReadbackClient extends FakeClient {
+      override async request(
+        path: string,
+        options: Parameters<FakeClient['request']>[1]
+      ): Promise<unknown> {
+        if (options.method === 'POST') {
+          const body = options.body as Record<string, unknown>;
+          this.responses.set(path, {
+            data: {
+              ...body,
+              url_settings: (body.urls as string[]).map((url) => ({ ...body, url })),
+            },
+          });
+        }
+        return super.request(path, options);
+      }
+    }
+    const client = new CompleteReadbackClient();
+    client.responses.set('/hooks_settings/55', {
+      data: {
+        ...settings,
+        good: 1,
+        schedule: 1,
+        self_sending: 0,
+        url_settings: settings.urls.map((url) => ({
+          ...settings,
+          good: 1,
+          schedule: 1,
+          self_sending: 0,
+          url,
+        })),
+      },
+    });
+    const tool = buildTools(testConfig, client).find(
+      (item) => item.name === 'integrations_hub_change_location_webhooks'
+    )!;
+    const request = {
+      ...base,
+      change: {
+        action: 'set_events',
+        events: { schedule: false },
+        overwrite_shared_settings: true,
+      },
+    };
+    const plan = (await tool.handler({ ...request, mode: 'plan' })) as Record<string, unknown>;
+    const result = await tool.handler({
+      ...request,
+      mode: 'apply',
+      expected_snapshot: plan.expected_snapshot,
+      confirmation: 'CHANGE LOCATION 55 WEBHOOKS',
+    });
+    expect(result).toMatchObject({ fully_verified: true, verification: { unreadable_fields: [] } });
+    expect(client.calls.filter((call) => call.options.method === 'POST')).toHaveLength(1);
+  });
+
   test('empty location response does not turn its blank URL sentinel into a destination', () => {
     const empty = parseHookSettings({
       data: {
