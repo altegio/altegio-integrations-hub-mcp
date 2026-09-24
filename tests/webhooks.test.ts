@@ -1,6 +1,11 @@
 import { buildTools } from '../src/tools.js';
 import { installationSettings } from '../src/schemas.js';
-import { eventFields, parseHookSettings, planHookChange } from '../src/webhooks.js';
+import {
+  eventFields,
+  hookSettingsMatchBody,
+  parseHookSettings,
+  planHookChange,
+} from '../src/webhooks.js';
 import { FakeClient, testConfig } from './helpers.js';
 
 const settings = {
@@ -52,8 +57,8 @@ describe('location webhooks', () => {
     const result = await tool.handler(base);
     expect(result).toMatchObject({
       urls: settings.urls,
-      events: { location: true, team_member: false, product: null },
-      unreadable_fields: ['product', 'self_sending'],
+      events: { location: true, team_member: false, product: null, schedule: null },
+      unreadable_fields: ['product', 'schedule', 'self_sending', 'per_url_flags'],
     });
     expect(client.calls).toEqual([{ path: '/hooks_settings/55', options: { lane: 'user' } }]);
   });
@@ -178,6 +183,79 @@ describe('location webhooks', () => {
       good: 1,
       self_sending: 1,
     });
-    expect(Object.keys(eventFields)).toHaveLength(14);
+    expect(Object.keys(eventFields)).toHaveLength(15);
+  });
+
+  test('complete read exposes per-URL flags and detects changes beyond the first URL', () => {
+    const first = {
+      ...settings,
+      good: 1,
+      schedule: 1,
+      self_sending: 0,
+    };
+    const second = { ...first, good: 0, self_sending: 1 };
+    const response = {
+      data: {
+        ...first,
+        company_id: 55,
+        url_settings: [
+          { ...first, url: settings.urls[0] },
+          { ...second, url: settings.urls[1] },
+        ],
+      },
+    };
+    const current = parseHookSettings(response);
+    expect(current).toMatchObject({
+      events: { product: true, schedule: true },
+      self_sending: false,
+      unreadable_fields: [],
+      url_settings: [
+        { events: { product: true }, self_sending: false },
+        { events: { product: false }, self_sending: true },
+      ],
+    });
+    const changed = parseHookSettings({
+      data: {
+        ...response.data,
+        url_settings: [
+          response.data.url_settings[0],
+          { ...second, url: settings.urls[1], good: 1 },
+        ],
+      },
+    });
+    expect(changed.snapshot).not.toBe(current.snapshot);
+    const body = planHookChange(current, {
+      action: 'set_events',
+      events: { schedule: false },
+      overwrite_shared_settings: true,
+    });
+    expect(body).toMatchObject({ good: 1, schedule: 0, self_sending: 0 });
+    expect(hookSettingsMatchBody(current, body)).toBe(false);
+    const allSaved = parseHookSettings({
+      data: {
+        ...body,
+        url_settings: settings.urls.map((url) => ({ ...body, url })),
+      },
+    });
+    expect(hookSettingsMatchBody(allSaved, body)).toBe(true);
+  });
+
+  test('empty location response does not turn its blank URL sentinel into a destination', () => {
+    const empty = parseHookSettings({
+      data: {
+        ...settings,
+        urls: [''],
+        good: 0,
+        schedule: 0,
+        self_sending: 0,
+        url_settings: [],
+      },
+    });
+    expect(empty.urls).toEqual([]);
+    expect(
+      planHookChange(empty, { action: 'add_destination', url: 'https://new.example/hook' })
+    ).toMatchObject({
+      urls: ['https://new.example/hook'],
+    });
   });
 });

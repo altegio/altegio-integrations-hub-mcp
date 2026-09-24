@@ -5,7 +5,12 @@ import { MarketplaceClient } from './client.js';
 import { IdempotencyStore } from './idempotency.js';
 import { MarketplaceError } from './errors.js';
 import { planned, requireConfirmation } from './safety.js';
-import { eventFields, parseHookSettings, planHookChange, webhookChange } from './webhooks.js';
+import {
+  hookSettingsMatchBody,
+  parseHookSettings,
+  planHookChange,
+  webhookChange,
+} from './webhooks.js';
 import {
   accountPayload,
   createAccountPayload,
@@ -179,7 +184,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
   return [
     tool(
       'integrations_hub_get_location_webhooks',
-      'Read location-wide entity webhook destinations and event flags for a location accessible to the caller. The application ID checks developer ownership; the location API enforces user permissions. Product and self-sending cannot be read upstream.',
+      'Read location-wide entity webhook destinations and per-URL event flags for a location accessible to the caller. The application ID checks developer ownership; the location API enforces user permissions. This reports configuration, not delivery status.',
       z.object({ ...partnerAndApp, location_id: positiveId }).strict(),
       { readOnly: true },
       async ({ partner_id, application_id, location_id }) => {
@@ -191,7 +196,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
     ),
     tool(
       'integrations_hub_change_location_webhooks',
-      'Plan or change the location-wide entity hook list and shared event selection. This legacy POST replaces the whole list and applies one selection to every URL. Supply the unreadable product and self-sending values explicitly. Apply requires the plan snapshot and exact confirmation.',
+      'Plan or change the location-wide entity hook list and shared event selection. POST replaces the whole list and applies one selection to every URL. Review per-URL flags before applying; apply requires the plan snapshot and exact confirmation.',
       z
         .object({
           ...mutation,
@@ -227,7 +232,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
               'POST',
               path,
               body,
-              `Location-wide replacement; all destinations receive identical event flags. Upstream GET omits product and self-sending, so verify the supplied values. Apply requires: ${phrase}`
+              `Location-wide replacement; all destinations receive identical event flags. Review current url_settings and the complete request body. Apply requires: ${phrase}`
             ),
             expected_snapshot: current.snapshot,
             current,
@@ -242,19 +247,9 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
         requireConfirmation(confirmation, phrase);
         await client.request(path, { method: 'POST', lane: 'user', body });
         const verified = parseHookSettings(await client.request(path, { lane: 'user' }));
-        const visibleEventMismatch = Object.entries(verified.events).some(([name, enabled]) => {
-          if (name === 'product') return false;
-          const field = eventFields[name as keyof typeof eventFields];
-          return Number(enabled) !== body[field];
-        });
-        if (
-          JSON.stringify([...verified.urls].sort()) !==
-            JSON.stringify([...(body.urls as string[])].sort()) ||
-          verified.active !== body.active ||
-          visibleEventMismatch
-        ) {
+        if (!hookSettingsMatchBody(verified, body)) {
           throw new MarketplaceError(
-            'Webhook settings write returned, but read-back did not match visible settings.',
+            'Webhook settings write returned, but read-back did not match saved settings.',
             502
           );
         }
@@ -263,6 +258,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
           applied: true,
           operation: 'change_location_webhooks',
           verification: verified,
+          fully_verified: verified.unreadable_fields.length === 0,
         };
       }
     ),
