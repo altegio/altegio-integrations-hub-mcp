@@ -139,6 +139,10 @@ Step 2 is `POST https://app.alteg.io/marketplace/partner/callback` using partner
 
 The callback validates partner ownership/access strategy, pending freshness, stores partner settings, chooses an installer by application slug/category, links/configures the system user, creates webhooks/chat settings, marks active, logs the transition, and emits `ApplicationInstalledEvent`. Repeating a callback after active is rejected by Biz.ERP; callers should status-check first.
 
+The status endpoint's `logs[]` records who caused each transition: the owner's `user_id` on the `uninstalled → pending` row (`source: marketplace`, or `multisalon` for the other locations of a multi-location grant) and `null` on `automatic_expiration`. An application whose setup page receives signed `user_data` can therefore confirm only the grant that same person just made: verify the HMAC, read the status, and call the callback only when the latest `status_to: pending` row carries that `user_id`. The four Altegio MCP listings do exactly this in `altegio-mcp-platform/mcp-proxy/lib/marketplace.js`; before it, every Connect expired after 12 hours and the card never showed them as connected.
+
+The card frontend (`backoffice/marketplace/.../MarketplaceProductDefault.vue`) opens an install modal before the grant when the application requests any permission, personal-data access or a user, or when the multi-location picker applies (`is_multiple_salons_allowed` and more than one editable location); otherwise Connect grants immediately. After the grant it sets the link to `pending` in local state and, for `is_iframe`, switches to the Settings tab. It never polls: a confirmation made while the owner watches reaches the button on the next card load, so the embedded page should say so itself (the Settings channel's `show_toast` is the only in-card signal).
+
 There is no partner freeze/unfreeze endpoint. Freeze is driven by internal expiry/payment behavior. `POST /marketplace/partner/payment` records a successful payment and the payment flow can invoke `processUnfreeze`. Uninstall is idempotent internally if the last state is already uninstalled.
 
 Status and inventory:
