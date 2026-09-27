@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "altegio-integrations-hub": {
+      "type": "http",
+      "url": "https://mcp.alteg.io/integrations-hub"
+    },
+    "altegio-bi-data": {
+      "type": "http",
+      "url": "https://mcp.altegio.dev/bi-data"
+    },
+    "altegio-support": {
+      "type": "http",
+      "url": "https://mcp.altegio.dev/support"
+    }
+  }
+}

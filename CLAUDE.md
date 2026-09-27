@@ -24,3 +24,7 @@ npm run check
 - A caller must own the partner/application through Developer Cabinet before partner-token operations run.
 - Never log or return partner/user tokens. Normalize legacy `salon` names to `location` at the tool boundary.
 - Preserve server-side idempotency signals; add a local idempotency key for payment-like operations.
+
+## MCP servers
+
+Project MCP servers are declared in `.mcp.json` (altegio-integrations-hub, altegio-bi-data, altegio-support) and auto-approved via `.claude/settings.json`. First use on a machine: `/mcp` → Authenticate (Google). claude.ai connectors this project normally needs: Slack. Every other connector (Notion, Gmail, Google Drive, Atlassian, Whisper Flow, Kommo, Cognee) stays off by default; enable one for the current session only when the task needs it.
