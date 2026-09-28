@@ -10,6 +10,35 @@ import { createServer } from './server.js';
 
 type TransportMap = Record<string, StreamableHTTPServerTransport>;
 
+function sessionTransport(
+  transports: TransportMap,
+  sessionId: string | undefined
+): StreamableHTTPServerTransport | undefined {
+  // Own keys only: a header such as `constructor` is not a session.
+  return sessionId && Object.hasOwn(transports, sessionId) ? transports[sessionId] : undefined;
+}
+
+/**
+ * Sessions live in process memory, so a restart or redeploy forgets them all. The Streamable
+ * HTTP transport answers a session ID this process does not hold with 404, which tells the
+ * client to start a new session with `initialize`; a missing session ID is 400.
+ */
+function rejectSessionlessRequest(response: express.Response, sessionId: string | undefined): void {
+  if (sessionId) {
+    response.status(404).json({
+      jsonrpc: '2.0',
+      error: { code: -32001, message: 'Session not found' },
+      id: null,
+    });
+    return;
+  }
+  response.status(400).json({
+    jsonrpc: '2.0',
+    error: { code: -32000, message: 'Bad Request: Missing session ID' },
+    id: null,
+  });
+}
+
 export function createApp(config: Config): { app: express.Express; transports: TransportMap } {
   const app = express();
   const transports: TransportMap = {};
@@ -18,7 +47,7 @@ export function createApp(config: Config): { app: express.Express; transports: T
 
   app.post('/mcp', async (request, response) => {
     const sessionId = request.header('mcp-session-id');
-    let transport = sessionId ? transports[sessionId] : undefined;
+    let transport = sessionTransport(transports, sessionId);
     if (!transport && !sessionId && isInitializeRequest(request.body)) {
       transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: randomUUID,
@@ -32,11 +61,7 @@ export function createApp(config: Config): { app: express.Express; transports: T
       await createServer(config).connect(transport);
     }
     if (!transport) {
-      response.status(400).json({
-        jsonrpc: '2.0',
-        id: null,
-        error: { code: -32000, message: 'Invalid or missing MCP session ID' },
-      });
+      rejectSessionlessRequest(response, sessionId);
       return;
     }
     await runWithContext(parseRequestContext(request.headers), () =>
@@ -47,9 +72,9 @@ export function createApp(config: Config): { app: express.Express; transports: T
   for (const method of ['get', 'delete'] as const) {
     app[method]('/mcp', async (request, response) => {
       const sessionId = request.header('mcp-session-id');
-      const transport = sessionId ? transports[sessionId] : undefined;
+      const transport = sessionTransport(transports, sessionId);
       if (!transport) {
-        response.status(400).json({ error: 'Invalid or missing MCP session ID' });
+        rejectSessionlessRequest(response, sessionId);
         return;
       }
       await runWithContext(parseRequestContext(request.headers), () =>
