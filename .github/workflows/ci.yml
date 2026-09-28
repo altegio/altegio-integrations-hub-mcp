@@ -21,7 +21,13 @@ jobs:
       - run: docker build -t altegio-integrations-hub-mcp:ci .
       - name: Container smoke
         run: |
-          docker run -d --rm --name integrations-hub-mcp -p 8094:8094 -e ALTEGIO_PARTNER_TOKEN=test altegio-integrations-hub-mcp:ci
-          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8094/health && exit 0; sleep 1; done
-          docker logs integrations-hub-mcp
-          exit 1
+          docker run -d --name integrations-hub-mcp -p 8094:8094 -e ALTEGIO_PARTNER_TOKEN=test altegio-integrations-hub-mcp:ci
+          healthy=
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8094/health && healthy=1 && break; sleep 1; done
+          # A deploy stops the container with SIGTERM; the restart alert reads the stop line.
+          docker stop integrations-hub-mcp
+          logs=$(docker logs integrations-hub-mcp 2>&1)
+          printf '%s\n' "$logs"
+          test -n "$healthy"
+          grep -q 'Received SIGTERM, shutting down' <<< "$logs"
+          test "$(docker inspect -f '{{.State.ExitCode}}' integrations-hub-mcp)" = 0
