@@ -6,7 +6,7 @@
     },
     "altegio-bi-data": {
       "type": "http",
-      "url": "https://mcp.altegio.dev/bi-data"
+      "url": "https://mcp.altegio.dev/bi-data/mcp"
     },
     "altegio-support": {
       "type": "http",
