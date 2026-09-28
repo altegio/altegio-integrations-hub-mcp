@@ -1,7 +1,3 @@
 {
-  "enabledMcpjsonServers": [
-    "altegio-bi-data",
-    "altegio-integrations-hub",
-    "altegio-support"
-  ]
+  "enabledMcpjsonServers": ["altegio-bi-data", "altegio-integrations-hub", "altegio-support"]
 }
