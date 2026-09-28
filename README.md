@@ -106,7 +106,7 @@ docker build -t altegio-integrations-hub-mcp .
 docker run --rm -p 8094:8094 -e ALTEGIO_PARTNER_TOKEN=test altegio-integrations-hub-mcp
 ```
 
-Tests cover schemas/safety, request-scoped authentication, upstream error normalization, the owner-only tool inventory, plan no-op behavior, application idempotency, normalized install payloads, and Streamable HTTP initialization.
+Tests cover schemas/safety, request-scoped authentication, upstream error normalization, the owner-only tool inventory, plan no-op behavior, application idempotency, normalized install payloads, Streamable HTTP initialization, and the SIGTERM shutdown (stop line, bounded drain).
 
 The current contract/completeness review is [docs/AUDIT-2026-09-19.md](docs/AUDIT-2026-09-19.md). The four dedicated iframe tools publish MCP output schemas; the remaining tool families still expose raw or lightly wrapped upstream output and are tracked as follow-up work in that audit.
 
