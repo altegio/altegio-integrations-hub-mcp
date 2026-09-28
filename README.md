@@ -8,8 +8,9 @@ Public-zone MCP server for robotized creation, configuration, rollout, operation
 Marketplace administration is intentionally excluded. Moderation decisions, publication, ranking, commissions, application removal by moderators, and special-offer management belong in a separate moderator-only skill or service.
 
 **Hosted MCP address:** `https://mcp.alteg.io/integrations-hub`.
-This is the address to paste into a remote MCP client. The platform also accepts
-the older `/public/integrations-hub/mcp` path as an alias.
+This is the address to paste into a remote MCP client. The older
+`/public/integrations-hub/mcp` path was retired on 2026-09-28: it answers `410`
+naming this address, and a client still on it signs in again here.
 
 ## Connect in minutes
 
