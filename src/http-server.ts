@@ -50,7 +50,10 @@ export function createApp(
 ): { app: express.Express; transports: TransportMap } {
   const app = express();
   const transports: TransportMap = {};
-  const budget = new HttpSessionBudget(options.maxSessions, options.idleTimeoutMs);
+  const budget = new HttpSessionBudget(
+    options.maxSessions ?? config.MCP_HTTP_MAX_SESSIONS,
+    options.idleTimeoutMs
+  );
   const leases = new WeakMap<StreamableHTTPServerTransport, HttpSessionLease>();
   app.use(express.json({ limit: '1mb' }));
   app.get('/health', (_request, response) => response.json({ status: 'ok' }));
@@ -159,7 +162,9 @@ export async function shutdown(
 export function start(config = loadConfig()): Server {
   const { app, transports } = createApp(config);
   const server = app.listen(config.PORT, '0.0.0.0', () =>
-    process.stderr.write(`Altegio Integrations Hub MCP listening on ${config.PORT}\n`)
+    process.stderr.write(
+      `Altegio Integrations Hub MCP listening on ${config.PORT}; HTTP session capacity: ${config.MCP_HTTP_MAX_SESSIONS}\n`
+    )
   );
   let stopping = false;
   const stop = (signal: NodeJS.Signals): void => {

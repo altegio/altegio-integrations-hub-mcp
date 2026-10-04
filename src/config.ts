@@ -7,6 +7,7 @@ export const ConfigSchema = z.object({
   ALTEGIO_API_BASE: z.string().url().default('https://api.alteg.io/api/v1'),
   ALTEGIO_APP_BASE: z.string().url().default('https://app.alteg.io'),
   PORT: z.coerce.number().int().min(1).max(65535).default(8094),
+  MCP_HTTP_MAX_SESSIONS: z.coerce.number().int().min(1).default(384),
   INTEGRATIONS_HUB_MCP_STATE_DIR: z.string().default('.integrations-hub-mcp'),
 });
 
