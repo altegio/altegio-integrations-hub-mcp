@@ -126,3 +126,9 @@ Live mutation tests are intentionally not part of CI because they would create M
 - Lifecycle callback URLs must target the application's backend, not this OAuth-protected MCP endpoint.
 
 Read [docs/marketplace-internals.md](docs/marketplace-internals.md) before adding or changing operations. For applications that deliver code into the booking widget — analytics counters, tag managers, booking-form injections, and the dormant `type='plugin'` application class — read [docs/widget-analytics-and-plugins.md](docs/widget-analytics-and-plugins.md). For surfaces rendered inside the ERP — the Settings tab, the journal sidebar panel, entity tabs, signing a person in without OAuth, and editing a live application card — read [docs/embedded-surfaces.md](docs/embedded-surfaces.md).
+
+HTTP sessions share a 128-session capacity and expire after 30 idle minutes.
+In-flight POST responses remain protected; an idle SSE stream alone does not
+keep a session alive. Expired IDs return 404 for client reinitialization, and
+new initialization at capacity returns 503 with `Retry-After: 60`. Shutdown
+closes the remaining transports after draining active requests.

@@ -208,3 +208,57 @@ describe('HTTP session status codes', () => {
     });
   });
 });
+
+describe('HTTP session retention', () => {
+  test('bounds initialized servers and reclaims idle transports', async () => {
+    const { app, transports } = createApp(testConfig, { maxSessions: 1, idleTimeoutMs: 100 });
+    const listener = app.listen(0, '127.0.0.1');
+    await new Promise<void>((resolve) => listener.once('listening', resolve));
+    const port = (listener.address() as AddressInfo).port;
+    const headers = {
+      'content-type': 'application/json',
+      accept: 'application/json, text/event-stream',
+    };
+    const url = `http://127.0.0.1:${port}/mcp`;
+    const initialize = (): Promise<Response> =>
+      fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: {
+            protocolVersion: '2025-11-25',
+            capabilities: {},
+            clientInfo: { name: 'abandoned-client', version: '1' },
+          },
+        }),
+      });
+    try {
+      const first = await initialize();
+      await first.text();
+      expect(first.status).toBe(200);
+      const sessionId = first.headers.get('mcp-session-id')!;
+      const blocked = await initialize();
+      await blocked.text();
+      expect(blocked.status).toBe(503);
+      expect(blocked.headers.get('retry-after')).toBe('60');
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(Object.keys(transports)).toHaveLength(0);
+      const stale = await fetch(url, {
+        method: 'POST',
+        headers: { ...headers, 'mcp-session-id': sessionId },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'ping' }),
+      });
+      await stale.text();
+      expect(stale.status).toBe(404);
+      const replacement = await initialize();
+      await replacement.text();
+      expect(replacement.status).toBe(200);
+    } finally {
+      for (const transport of Object.values(transports)) await transport.close();
+      listener.close();
+    }
+  });
+});
