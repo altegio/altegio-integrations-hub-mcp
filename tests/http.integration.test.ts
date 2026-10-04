@@ -211,7 +211,10 @@ describe('HTTP session status codes', () => {
 
 describe('HTTP session retention', () => {
   test('bounds initialized servers and reclaims idle transports', async () => {
-    const { app, transports } = createApp(testConfig, { maxSessions: 1, idleTimeoutMs: 100 });
+    const { app, transports } = createApp(
+      { ...testConfig, MCP_HTTP_MAX_SESSIONS: 1 },
+      { idleTimeoutMs: 100 }
+    );
     const listener = app.listen(0, '127.0.0.1');
     await new Promise<void>((resolve) => listener.once('listening', resolve));
     const port = (listener.address() as AddressInfo).port;
