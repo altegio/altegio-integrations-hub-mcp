@@ -10,7 +10,7 @@ describe('tool contracts', () => {
   test('tool names are unique and surface is broad', () => {
     const tools = buildTools(testConfig, new FakeClient());
     expect(new Set(tools.map((item) => item.name)).size).toBe(tools.length);
-    expect(tools).toHaveLength(35);
+    expect(tools).toHaveLength(36);
     expect(tools.map((item) => item.name)).toEqual(
       expect.arrayContaining([
         'integrations_hub_create_application',

@@ -16,8 +16,9 @@ import {
 import { z } from 'zod';
 import type { Config } from './config.js';
 import { safeError } from './errors.js';
+import { FEEDBACK_NUDGE, invitesFeedback, logSafeToken, sessionLogId } from './feedback.js';
 import { redactSecrets } from './redact.js';
-import { buildTools, type ToolSpec } from './tools.js';
+import { buildTools, type ToolCall, type ToolSpec } from './tools.js';
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const docsDirectory = resolve(currentDirectory, '..', 'docs');
@@ -77,9 +78,36 @@ function toTool(spec: ToolSpec): Tool {
     annotations: {
       readOnlyHint: spec.readOnly,
       destructiveHint: spec.destructive,
-      idempotentHint: spec.readOnly,
-      openWorldHint: true,
+      idempotentHint: spec.idempotent ?? spec.readOnly,
+      openWorldHint: spec.openWorld ?? true,
     },
+  };
+}
+
+type Headers = Record<string, string | string[] | undefined>;
+
+/**
+ * The fields that tie a tool call's log lines together, and to the proxy's: its request id
+ * (`x-mcp-auth-request-id`, the id the proxy logs), transport, a hash of the session, and the
+ * client's own name and version from `initialize`. Never arguments or tokens.
+ */
+function callCorrelation(
+  server: Server,
+  extra: { sessionId?: string; requestInfo?: { headers: Headers } }
+): ToolCall['correlation'] {
+  const headers = extra.requestInfo?.headers;
+  const header = (name: string): string | undefined => {
+    const value = headers?.[name];
+    return Array.isArray(value) ? value[0] : value;
+  };
+  const client = server.getClientVersion();
+  return {
+    request_id: logSafeToken(header('x-mcp-auth-request-id') ?? header('x-request-id')),
+    route: headers ? '/mcp' : undefined,
+    transport: headers ? (extra.sessionId ? 'session' : 'stateless') : 'stdio',
+    session: extra.sessionId ? sessionLogId(extra.sessionId) : undefined,
+    client_name: logSafeToken(client?.name),
+    client_version: logSafeToken(client?.version),
   };
 }
 
@@ -93,20 +121,29 @@ export function createServer(config: Config): Server {
         prompts: { listChanged: false },
       },
       instructions:
-        'Automate an Altegio developer account and its Integrations Hub applications. Start with read tools and mode=plan. Developer Cabinet operations use the caller Altegio token. Partner actions verify application ownership. Marketplace administration, moderation decisions, publication, ranking, commissions, and special-offer management are intentionally outside this public MCP. Read altegio://integrations-hub/tool-boundaries before using restricted owner-facing surfaces.',
+        'Automate an Altegio developer account and its Integrations Hub applications. Start with read tools and mode=plan. Developer Cabinet operations use the caller Altegio token. Partner actions verify application ownership. Marketplace administration, moderation decisions, publication, ranking, commissions, and special-offer management are intentionally outside this public MCP. Read altegio://integrations-hub/tool-boundaries before using restricted owner-facing surfaces. Report a bug or a missing capability of this server with feedback_submit (ids only, not user complaints).',
     }
   );
   const specs = buildTools(config).sort((left, right) => left.name.localeCompare(right.name));
   const byName = new Map(specs.map((spec) => [spec.name, spec]));
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: specs.map(toTool) }));
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     const spec = byName.get(request.params.name);
     if (!spec) throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${request.params.name}`);
     try {
-      const result = redactSecrets(await spec.handler(request.params.arguments ?? {}));
+      const result = redactSecrets(
+        await spec.handler(request.params.arguments ?? {}, {
+          correlation: callCorrelation(server, extra),
+        })
+      );
       return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        content: [
+          {
+            type: 'text',
+            text: spec.resultText ? spec.resultText(result) : JSON.stringify(result, null, 2),
+          },
+        ],
         structuredContent:
           result && typeof result === 'object' ? (result as Record<string, unknown>) : { result },
       };
@@ -114,7 +151,11 @@ export function createServer(config: Config): Server {
       const result = redactSecrets(safeError(error)) as Record<string, unknown>;
       return {
         isError: true,
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        content: [
+          { type: 'text', text: JSON.stringify(result, null, 2) },
+          // The one moment an agent has both the reason and the details to report a defect.
+          ...(invitesFeedback(spec.name, error) ? [{ type: 'text', text: FEEDBACK_NUDGE }] : []),
+        ],
         structuredContent: result,
       };
     }

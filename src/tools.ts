@@ -4,6 +4,7 @@ import type { Config } from './config.js';
 import { MarketplaceClient } from './client.js';
 import { IdempotencyStore } from './idempotency.js';
 import { MarketplaceError } from './errors.js';
+import { feedbackTool } from './feedback.js';
 import { planned, requireConfirmation } from './safety.js';
 import {
   hookSettingsMatchBody,
@@ -24,6 +25,12 @@ import {
   updateApplicationPayload,
 } from './schemas.js';
 
+/** What the server knows about the call in progress, beyond its arguments. */
+export interface ToolCall {
+  /** Request, route, transport, session and client fields that tie the call's log lines together. */
+  correlation: Readonly<Record<string, string | undefined>>;
+}
+
 export interface ToolSpec {
   name: string;
   description: string;
@@ -31,7 +38,13 @@ export interface ToolSpec {
   outputSchema?: z.ZodObject<z.ZodRawShape>;
   readOnly: boolean;
   destructive: boolean;
-  handler(input: unknown): Promise<unknown>;
+  /** Defaults to `readOnly`. */
+  idempotent?: boolean;
+  /** Defaults to true: the tool reaches Altegio. */
+  openWorld?: boolean;
+  /** A sentence for the result's text in place of its JSON. */
+  resultText?(result: unknown): string;
+  handler(input: unknown, call?: ToolCall): Promise<unknown>;
 }
 
 function tool<T extends z.ZodRawShape>(
@@ -182,6 +195,7 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
   const mutation = { mode };
 
   return [
+    feedbackTool(),
     tool(
       'integrations_hub_get_location_webhooks',
       'Read location-wide entity webhook destinations and per-URL event flags for a location accessible to the caller. The application ID checks developer ownership; the location API enforces user permissions. This reports configuration, not delivery status.',
