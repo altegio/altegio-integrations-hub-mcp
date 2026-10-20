@@ -24,4 +24,6 @@ The following routes are intentionally not described as public API by this repos
 
 All `/marketplace/developers/backoffice/*` routes are outside this server entirely. They represent a Marketplace administrator role rather than an application owner role and must only be exposed through a separate moderator-only skill or service with its own authorization boundary.
 
+`feedback_submit` calls no Altegio API. It writes one `agent_feedback` line to this server's own log, masked for contact details and secrets, keyed by a hash of the caller's token rather than the token, and is therefore served as read-only and closed-world.
+
 `/marketplace/application/new_message` is a normal partner integration endpoint and should be documented publicly; see the companion docs MR prepared with this server.

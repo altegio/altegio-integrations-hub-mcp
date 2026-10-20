@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { MarketplaceError } from './errors.js';
 
 interface Entry {
   fingerprint: string;
@@ -46,7 +47,10 @@ export class IdempotencyStore {
     try {
       const entry = JSON.parse(await readFile(this.file(key), 'utf8')) as Entry;
       if (entry.fingerprint !== fingerprint) {
-        throw new Error('Idempotency key was already used with a different payload.');
+        throw new MarketplaceError(
+          'Idempotency key was already used with a different payload.',
+          409
+        );
       }
       return entry.result;
     } catch (error) {

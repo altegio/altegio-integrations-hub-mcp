@@ -48,6 +48,12 @@ The server exposes 35 owner-facing tools:
 - Lifecycle: `integrations_hub_validate_lifecycle_callback`.
 - Webhooks: `integrations_hub_get_location_webhooks`, `integrations_hub_change_location_webhooks` (location-wide entity hooks). Read and update the separate application lifecycle `callback_url` through the application tools.
 
+It also serves `feedback_submit`, on the same contract as Altegio Pro MCP: an agent reports a bug or a missing capability, and the server writes one masked `agent_feedback` line to its own log (no other sink; nothing in Altegio changes). A failed call with an Altegio 5xx or an unexpected error ends with one sentence pointing at it; validation, auth, other 4xx, timeouts and network failures do not. Reports are limited to 5 per 10 minutes per user (else per session); a refusal carries `error_class: "rate_limited"`. In production the line reaches Cloud Logging through the container's gcplogs driver, as a string:
+
+```bash
+gcloud logging read 'logName="projects/altegio-mcp/logs/gcplogs-docker-driver" AND jsonPayload.container.metadata.service="altegio-integrations-hub-mcp" AND jsonPayload.message:"\"event\":\"agent_feedback\""' --project=altegio-mcp --freshness=7d
+```
+
 MCP resources:
 
 - `altegio://integrations-hub/internals` — the complete source-referenced Biz.ERP implementation guide;
@@ -106,7 +112,7 @@ docker build -t altegio-integrations-hub-mcp .
 docker run --rm -p 8094:8094 -e ALTEGIO_PARTNER_TOKEN=test altegio-integrations-hub-mcp
 ```
 
-Tests cover schemas/safety, request-scoped authentication, upstream error normalization, the owner-only tool inventory, plan no-op behavior, application idempotency, normalized install payloads, Streamable HTTP initialization, and the SIGTERM shutdown (stop line, bounded drain).
+Tests cover schemas/safety, agent feedback (schema, masking, rate limit, event shape, nudge), request-scoped authentication, upstream error normalization, the owner-only tool inventory, plan no-op behavior, application idempotency, normalized install payloads, Streamable HTTP initialization, and the SIGTERM shutdown (stop line, bounded drain).
 
 The current contract/completeness review is [docs/AUDIT-2026-09-19.md](docs/AUDIT-2026-09-19.md). The four dedicated iframe tools publish MCP output schemas; the remaining tool families still expose raw or lightly wrapped upstream output and are tracked as follow-up work in that audit.
 
