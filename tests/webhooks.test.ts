@@ -33,7 +33,7 @@ const change = {
   product: true,
   self_sending: false,
   overwrite_shared_settings: true,
-};
+} satisfies Parameters<typeof planHookChange>[1];
 
 describe('location webhooks', () => {
   test('activation rejects destination lists that the location API cannot manage', () => {
@@ -85,7 +85,7 @@ describe('location webhooks', () => {
       },
     });
     expect(client.calls).toHaveLength(1);
-    expect(client.calls[0].options.method).toBeUndefined();
+    expect(client.calls[0]!.options.method).toBeUndefined();
   });
 
   test('apply requires the snapshot and confirmation, then verifies the read-back', async () => {
@@ -309,7 +309,11 @@ describe('location webhooks', () => {
     });
     expect(empty.urls).toEqual([]);
     expect(
-      planHookChange(empty, { action: 'add_destination', url: 'https://new.example/hook' })
+      planHookChange(empty, {
+        action: 'add_destination',
+        url: 'https://new.example/hook',
+        overwrite_shared_settings: false,
+      })
     ).toMatchObject({
       urls: ['https://new.example/hook'],
     });
