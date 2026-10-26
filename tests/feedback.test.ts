@@ -120,7 +120,7 @@ describe('feedback_submit', () => {
 
   test('names the model as a log-safe token and the user by a hash', async () => {
     await callAs('user-token-a', { ...REPORT, model: 'Claude Opus 5.5 (1M)' });
-    const [event] = events();
+    const event = events()[0]!;
     expect(event.model).toBe('Claude_Opus_5.5_1M');
     // The key Altegio Pro MCP logs for the same token: sha256, first 16 hex.
     expect(event.principal).toBe('token-8d164b091dbedbbb');
