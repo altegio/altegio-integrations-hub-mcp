@@ -1,13 +1,13 @@
-import { jest } from '@jest/globals';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { MarketplaceClient } from '../src/client.js';
 import { runWithContext } from '../src/context.js';
 import { testConfig } from './helpers.js';
 
 describe('MarketplaceClient', () => {
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => vi.restoreAllMocks());
 
   test('uses the request-scoped user token without putting it in the URL', async () => {
-    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ success: true, data: [] }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -25,7 +25,7 @@ describe('MarketplaceClient', () => {
   });
 
   test('partner lane never adds a user token', async () => {
-    const fetchMock = jest
+    const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response(null, { status: 204 }));
     const client = new MarketplaceClient({ ...testConfig, ALTEGIO_USER_TOKEN: 'stored-user' });
@@ -36,7 +36,7 @@ describe('MarketplaceClient', () => {
   });
 
   test('partner lane can use an owned developer-account token', async () => {
-    const fetchMock = jest
+    const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response(null, { status: 204 }));
     const client = new MarketplaceClient(testConfig);
@@ -51,7 +51,7 @@ describe('MarketplaceClient', () => {
   });
 
   test('extracts a partner token from a developer account relationship', async () => {
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
           data: [{ id: 3, partner_system: { data: { token: 'account-partner-token' } } }],
@@ -64,7 +64,7 @@ describe('MarketplaceClient', () => {
   });
 
   test('upstream error details are bounded to the parsed response', async () => {
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ success: false, meta: { message: 'denied' } }), {
         status: 403,
       })

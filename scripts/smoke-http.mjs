@@ -47,8 +47,36 @@ try {
   await notification.arrayBuffer();
   assert.equal(notification.status, 202);
   const result = await rpc('tools/list', {});
-  assert.ok(result.tools.length > 0);
-  console.log(`MCP initialize/tools/list passed (${result.tools.length} tools)`);
+  assert.ok(result.tools.some(({ name }) => name === 'integrations_hub_list_applications'));
+  assert.ok(!result.tools.some(({ name }) => /backoffice|moderate_application/.test(name)));
+  const { resources } = await rpc('resources/list', {});
+  assert.equal(resources.length, 5);
+  for (const resource of resources) {
+    const read = await rpc('resources/read', { uri: resource.uri });
+    assert.ok(read.contents[0].text.length > 100);
+  }
+  const plan = await rpc('tools/call', {
+    name: 'integrations_hub_delete_developer_account',
+    arguments: { partner_id: 3, mode: 'plan' },
+  });
+  assert.equal(plan.structuredContent.applied, false);
+  const refused = await rpc('tools/call', {
+    name: 'integrations_hub_list_developer_accounts',
+    arguments: {},
+  });
+  assert.equal(refused.isError, true);
+  assert.equal(refused.structuredContent.status, 401);
+  const hostile = await fetch(url, {
+    method: 'POST',
+    headers: { ...headers, Origin: 'https://hostile.example' },
+    body: '{}',
+    signal: AbortSignal.timeout(10000),
+  });
+  await hostile.arrayBuffer();
+  assert.equal(hostile.status, 403);
+  console.log(
+    `MCP initialize, ${result.tools.length} tools, ${resources.length} resources, plan and identity/origin refusals passed`
+  );
 } finally {
   if (headers['mcp-session-id']) {
     const response = await fetch(url, {
@@ -58,5 +86,12 @@ try {
     });
     await response.arrayBuffer();
     assert.equal(response.status, 200, 'session cleanup');
+    const stale = await fetch(url, {
+      method: 'DELETE',
+      headers,
+      signal: AbortSignal.timeout(10000),
+    });
+    await stale.arrayBuffer();
+    assert.equal(stale.status, 404, 'deleted session must not be reusable');
   }
 }

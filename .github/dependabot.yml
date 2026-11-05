@@ -3,8 +3,16 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule: { interval: weekly }
+    groups:
+      mcp-sdk:
+        patterns: ['@modelcontextprotocol/*']
+      lint:
+        patterns: ['eslint', '@eslint/*', 'typescript-eslint', 'globals']
+      vitest:
+        patterns: ['vitest', '@vitest/*']
     ignore:
-      - dependency-name: '@modelcontextprotocol/sdk'
+      # Requires peer support from typescript-eslint before the next compiler major.
+      - dependency-name: typescript
         update-types: [version-update:semver-major]
   - package-ecosystem: docker
     directory: /

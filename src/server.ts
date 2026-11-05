@@ -1,24 +1,21 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { Server } from '@modelcontextprotocol/server';
 import {
-  CallToolRequestSchema,
-  ErrorCode,
-  GetPromptRequestSchema,
-  ListPromptsRequestSchema,
-  ListResourcesRequestSchema,
-  ListToolsRequestSchema,
-  McpError,
-  ReadResourceRequestSchema,
+  ProtocolErrorCode,
+  ProtocolError,
   type Tool,
-} from '@modelcontextprotocol/sdk/types.js';
+  type ServerContext,
+  type CallToolResult,
+} from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import type { Config } from './config.js';
 import { safeError } from './errors.js';
 import { FEEDBACK_NUDGE, invitesFeedback, logSafeToken, sessionLogId } from './feedback.js';
 import { redactSecrets } from './redact.js';
 import { buildTools, type ToolCall, type ToolSpec } from './tools.js';
+import { parseRequestContext, requestContext, runWithContext } from './context.js';
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const docsDirectory = resolve(currentDirectory, '..', 'docs');
@@ -84,21 +81,15 @@ function toTool(spec: ToolSpec): Tool {
   };
 }
 
-type Headers = Record<string, string | string[] | undefined>;
-
 /**
  * The fields that tie a tool call's log lines together, and to the proxy's: its request id
  * (`x-mcp-auth-request-id`, the id the proxy logs), transport, a hash of the session, and the
  * client's own name and version from `initialize`. Never arguments or tokens.
  */
-function callCorrelation(
-  server: Server,
-  extra: { sessionId?: string; requestInfo?: { headers: Headers } }
-): ToolCall['correlation'] {
-  const headers = extra.requestInfo?.headers;
+function callCorrelation(server: Server, extra: ServerContext): ToolCall['correlation'] {
+  const headers = extra.http?.req?.headers;
   const header = (name: string): string | undefined => {
-    const value = headers?.[name];
-    return Array.isArray(value) ? value[0] : value;
+    return headers?.get(name) ?? undefined;
   };
   const client = server.getClientVersion();
   return {
@@ -127,15 +118,28 @@ export function createServer(config: Config): Server {
   const specs = buildTools(config).sort((left, right) => left.name.localeCompare(right.name));
   const byName = new Map(specs.map((spec) => [spec.name, spec]));
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: specs.map(toTool) }));
-  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+  server.setRequestHandler('tools/list', async () => ({ tools: specs.map(toTool) }));
+  server.setRequestHandler('tools/call', async (request, extra): Promise<CallToolResult> => {
     const spec = byName.get(request.params.name);
-    if (!spec) throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${request.params.name}`);
+    if (!spec)
+      throw new ProtocolError(
+        ProtocolErrorCode.MethodNotFound,
+        `Unknown tool: ${request.params.name}`
+      );
     try {
       const result = redactSecrets(
-        await spec.handler(request.params.arguments ?? {}, {
-          correlation: callCorrelation(server, extra),
-        })
+        await runWithContext(
+          {
+            ...(extra.http?.req
+              ? parseRequestContext(Object.fromEntries(extra.http.req.headers))
+              : requestContext()),
+            signal: extra.mcpReq.signal,
+          },
+          () =>
+            spec.handler(request.params.arguments ?? {}, {
+              correlation: callCorrelation(server, extra),
+            })
+        )
       );
       return {
         content: [
@@ -154,14 +158,16 @@ export function createServer(config: Config): Server {
         content: [
           { type: 'text', text: JSON.stringify(result, null, 2) },
           // The one moment an agent has both the reason and the details to report a defect.
-          ...(invitesFeedback(spec.name, error) ? [{ type: 'text', text: FEEDBACK_NUDGE }] : []),
+          ...(invitesFeedback(spec.name, error)
+            ? [{ type: 'text' as const, text: FEEDBACK_NUDGE }]
+            : []),
         ],
         structuredContent: result,
       };
     }
   });
 
-  server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+  server.setRequestHandler('resources/list', async () => ({
     resources: resources.map((resource) => ({
       uri: resource.uri,
       name: resource.name,
@@ -170,10 +176,13 @@ export function createServer(config: Config): Server {
       mimeType: 'text/markdown',
     })),
   }));
-  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+  server.setRequestHandler('resources/read', async (request) => {
     const resource = resources.find((item) => item.uri === request.params.uri);
     if (!resource)
-      throw new McpError(ErrorCode.InvalidParams, `Unknown resource: ${request.params.uri}`);
+      throw new ProtocolError(
+        ProtocolErrorCode.InvalidParams,
+        `Unknown resource: ${request.params.uri}`
+      );
     return {
       contents: [
         {
@@ -185,7 +194,7 @@ export function createServer(config: Config): Server {
     };
   });
 
-  server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+  server.setRequestHandler('prompts/list', async () => ({
     prompts: [
       {
         name: 'integrations_hub_safe_draft_rollout',
@@ -198,14 +207,20 @@ export function createServer(config: Config): Server {
       },
     ],
   }));
-  server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+  server.setRequestHandler('prompts/get', async (request) => {
     if (request.params.name !== 'integrations_hub_safe_draft_rollout') {
-      throw new McpError(ErrorCode.InvalidParams, `Unknown prompt: ${request.params.name}`);
+      throw new ProtocolError(
+        ProtocolErrorCode.InvalidParams,
+        `Unknown prompt: ${request.params.name}`
+      );
     }
     const partnerId = request.params.arguments?.partner_id;
     const locationId = request.params.arguments?.location_id;
     if (!partnerId || !locationId)
-      throw new McpError(ErrorCode.InvalidParams, 'partner_id and location_id are required');
+      throw new ProtocolError(
+        ProtocolErrorCode.InvalidParams,
+        'partner_id and location_id are required'
+      );
     return {
       description: 'Safe draft rollout',
       messages: [

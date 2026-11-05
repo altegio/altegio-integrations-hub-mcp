@@ -1,0 +1,10 @@
+name: Feature request
+description: Propose a developer-owner or partner capability.
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: User need and proposed behavior
+      description: Include the published contract if available and identify any internal API boundary.
+    validations:
+      required: true

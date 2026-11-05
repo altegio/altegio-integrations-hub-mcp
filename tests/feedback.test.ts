@@ -1,9 +1,9 @@
 import type { AddressInfo } from 'node:net';
-import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { afterEach, beforeEach, describe, expect, vi, test } from 'vitest';
+import { Client } from '@modelcontextprotocol/client';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import { InMemoryTransport } from '@modelcontextprotocol/client';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { parseRequestContext, runWithContext } from '../src/context.js';
 import { MarketplaceError, ToolRefusal } from '../src/errors.js';
@@ -48,13 +48,13 @@ const callAs = (token: string, args: unknown): Promise<unknown> =>
 beforeEach(() => {
   clearFeedbackRateLimit();
   lines = [];
-  jest.spyOn(feedbackLog, 'write').mockImplementation((line) => {
+  vi.spyOn(feedbackLog, 'write').mockImplementation((line) => {
     lines.push(line);
   });
 });
 
 afterEach(() => {
-  jest.restoreAllMocks();
+  vi.restoreAllMocks();
 });
 
 describe('maskFeedbackText', () => {
@@ -144,7 +144,7 @@ describe('feedback_submit', () => {
 
   test('records at most the rate limit per caller and window', async () => {
     let now = Date.parse('2026-10-20T12:00:00Z');
-    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
     const { reports, windowMs } = FEEDBACK_RATE_LIMIT;
     for (let index = 0; index < reports; index += 1) await callAs('user-token-a', REPORT);
     await expect(callAs('user-token-a', REPORT)).rejects.toThrow(ToolRefusal);
@@ -264,9 +264,9 @@ describe('feedback_submit on the served surface', () => {
     [500, true],
     [404, false],
   ])('ends a failed call with an Altegio %i with the nudge: %s', async (status, nudged) => {
-    jest
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(new Response(JSON.stringify({ success: false }), { status }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ success: false }), { status })
+    );
     const client = await connect();
     const result = (await client.callTool({
       name: 'integrations_hub_list_developer_accounts',
@@ -303,7 +303,7 @@ describe('feedback_submit on the served surface', () => {
           requestInit: {
             headers: {
               'x-altegio-user-token': 'user-token-a',
-              'x-mcp-auth-request-id': '3f7c9a52-1d2e-4b8f-9c61-0a7e5d4b2c19',
+              'x-mcp-auth-request-id': 'synthetic-request-id',
             },
           },
         })
@@ -325,7 +325,7 @@ describe('feedback_submit on the served surface', () => {
     expect(events()[0]).toMatchObject({
       event: 'agent_feedback',
       server: 'altegio-integrations-hub-mcp',
-      request_id: '3f7c9a52-1d2e-4b8f-9c61-0a7e5d4b2c19',
+      request_id: 'synthetic-request-id',
       route: '/mcp',
       transport: 'session',
       session: expect.stringMatching(/^[0-9a-f]{12}$/),

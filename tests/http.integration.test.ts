@@ -1,3 +1,4 @@
+import { describe, expect, test } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import { createApp } from '../src/http-server.js';
 import { testConfig } from './helpers.js';

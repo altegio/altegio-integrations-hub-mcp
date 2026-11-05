@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 export interface RequestContext {
   userToken?: string;
   identity?: string;
+  signal?: AbortSignal;
 }
 
 type HeaderBag = Record<string, string | string[] | undefined>;

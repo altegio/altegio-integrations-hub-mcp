@@ -1,3 +1,4 @@
+import { describe, expect, test } from 'vitest';
 import { requireConfirmation } from '../src/safety.js';
 
 describe('safety boundaries', () => {
