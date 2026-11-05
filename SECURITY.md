@@ -2,7 +2,9 @@
 
 Security fixes target the current `main` branch and maintained hosted service. Older source snapshots are not separately maintained.
 
-Report suspected vulnerabilities privately through [Altegio's support contact page](https://alteg.io/en/contact/), requesting escalation to the Integrations Hub MCP maintainers. Include this repository URL, affected revision, impact and a minimal synthetic reproduction. Do not post credentials, customer records or exploitable details in public issues. GitHub private vulnerability reporting is not currently enabled for this repository.
+Use **Report a vulnerability** on the repository's [Security page](https://github.com/altegio/altegio-integrations-hub-mcp/security/advisories). Private vulnerability reporting was enabled and verified on 5 November 2026. Include the affected revision, impact and a minimal synthetic reproduction. Do not send live credentials or customer records.
+
+If private reporting is unavailable, open a minimal [contact-request issue](https://github.com/altegio/altegio-integrations-hub-mcp/issues/new) asking verified maintainers `@petroff` or `@maksimn-altegio` for a private channel. Include no exploit details, credentials, client records or private URLs in that public request. Share details only once a private channel is agreed.
 
 The HTTP backend expects a trusted authentication proxy. Keep the backend listener private; strip incoming identity headers and forward only the authenticated caller's `X-Altegio-User-Token`. The server validates ownership through Developer Cabinet. Host/Origin checks prevent browser-origin and DNS-rebinding requests; they do not authenticate a proxy or make the backend safe to expose directly. This repository does not currently verify signed proxy identity headers.
 
