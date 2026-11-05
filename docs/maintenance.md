@@ -33,8 +33,8 @@ Coverage floors (75% statements/lines, 70% branches/functions) are below the mea
 
 The secret scan covers available Git history and the current tracked snapshot. Its only reviewed historical exception is an exact synthetic request-ID UUID in `tests/feedback.test.ts`; the new fixture uses an explicit synthetic label. No production payloads or private specification snapshots were added.
 
-## Remaining decisions
+## Publication and remaining boundaries
 
-Independent exact-head review, merged-main checks and deployment evidence are release gates, recorded with the PR and private operational evidence. No repository settings, access, secrets, visibility, npm publications or public image releases are changed here. The concrete settings proposal is in [RELEASING.md](../RELEASING.md).
+Independent exact-head review, merged-main checks and deployment evidence remain release gates. On 5 November 2026, the owner approved and applied Pro-aligned repository protections, security reporting/scanning and the public profile. This repository was already public. Collaborator roles and secrets were preserved; no npm or public image release was made. See the verified [repository settings](../.github/REPOSITORY_SETTINGS.md) and [delivery rules](../RELEASING.md).
 
 Private source access remains necessary for authoritative Developer Cabinet contract review. Public CI uses synthetic fixtures and does not claim to check private source drift. Signed proxy-header verification is not implemented by this server; its current trusted-proxy deployment boundary is described in [SECURITY.md](../SECURITY.md).
