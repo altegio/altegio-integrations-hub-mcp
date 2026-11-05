@@ -18,30 +18,74 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
-    "check": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run build"
+    "test": "vitest run",
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm run test:coverage && npm run build && npm run catalog:check && npm run test:package",
+    "test:coverage": "vitest run --coverage",
+    "prepack": "npm run build",
+    "catalog": "npm run build && node scripts/catalog.mjs",
+    "catalog:check": "node scripts/catalog.mjs --check",
+    "test:package": "node scripts/package-smoke.mjs"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.2",
-    "dotenv": "^17.4.2",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "@modelcontextprotocol/node": "^2.1.2",
+    "dotenv": "^18.0.9",
     "express": "^5.3.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
+    "@modelcontextprotocol/client": "^2.4.0",
+    "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
-    "@types/jest": "^30.0.0",
-    "@types/node": "^22.20.1",
-    "eslint": "^9.39.1",
-    "globals": "^16.5.0",
-    "jest": "^30.4.2",
-    "prettier": "^3.9.0",
-    "ts-jest": "^29.4.11",
-    "tsx": "^4.23.1",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.48.0"
+    "@types/node": "^24.19.2",
+    "eslint": "^10.14.0",
+    "globals": "^17.14.0",
+    "prettier": "^3.9.10",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.1.0",
+    "@vitest/coverage-v8": "^5.1.0"
   },
   "engines": {
-    "node": ">=22.23.4 <23"
+    "node": "^24.22.2 || ^26.13.0",
+    "npm": ">=12.2.2 <13"
+  },
+  "packageManager": "npm@12.2.2",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/altegio/altegio-integrations-hub-mcp.git"
+  },
+  "homepage": "https://github.com/altegio/altegio-integrations-hub-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/altegio/altegio-integrations-hub-mcp/issues"
+  },
+  "files": [
+    "dist",
+    "docs/marketplace-internals.md",
+    "docs/embedded-surfaces.md",
+    "docs/safe-e2e.md",
+    "docs/tool-boundaries.md",
+    "docs/webhooks.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js"
+    },
+    "./http": {
+      "types": "./dist/http-server.d.ts",
+      "import": "./dist/http-server.js"
+    }
+  },
+  "overrides": {
+    "minimatch": "^11.0.1"
   }
 }

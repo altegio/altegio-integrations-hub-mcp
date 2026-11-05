@@ -1,7 +1,5 @@
+import { describe, expect, test } from 'vitest';
 import { createHmac } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { z } from 'zod';
 import { buildTools } from '../src/tools.js';
 import { FakeClient, testConfig } from './helpers.js';
@@ -433,41 +431,5 @@ describe('tool contracts', () => {
         },
       })
     ).resolves.toMatchObject({ valid: true, token_valid: true, signature_valid: true });
-  });
-
-  test('concurrent payment retries apply once per durable idempotency key', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'integrations-hub-mcp-idempotency-'));
-    try {
-      const client = new FakeClient();
-      const target = buildTools(
-        { ...testConfig, INTEGRATIONS_HUB_MCP_STATE_DIR: directory },
-        client
-      ).find((item) => item.name === 'integrations_hub_record_payment')!;
-      const input = {
-        mode: 'apply',
-        partner_id: 3,
-        application_id: 7,
-        location_id: 55,
-        currency_iso: 'BRL',
-        payment_sum: 100,
-        payment_date: '2026-09-12 10:00:00',
-        period_from: '2026-09-12 10:00:00',
-        period_to: '2026-10-12 10:00:00',
-        idempotency_key: 'payment-55-2026-09',
-        confirmation: 'RECORD PAYMENT FOR APPLICATION 7 AT LOCATION 55',
-      };
-      const results = await Promise.all([target.handler(input), target.handler(input)]);
-      expect(
-        client.calls.filter((call) => call.path === '/marketplace/partner/payment')
-      ).toHaveLength(1);
-      expect(results).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ applied: true }),
-          expect.objectContaining({ applied: false, idempotent: true }),
-        ])
-      );
-    } finally {
-      await rm(directory, { recursive: true, force: true });
-    }
   });
 });

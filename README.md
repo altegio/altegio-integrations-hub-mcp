@@ -1,6 +1,6 @@
 # Altegio Integrations Hub MCP
 
-Public-zone MCP server for robotized creation, configuration, rollout, operation, and analysis of developer-owned Altegio Integrations Hub applications. It wraps two deliberately separated surfaces:
+MCP server for creating, configuring, deploying, operating, and analyzing of developer-owned Altegio Integrations Hub applications. It wraps two deliberately separated surfaces:
 
 - documented public/partner APIs;
 - the authenticated Developer Cabinet API used by Biz.ERP itself.
@@ -36,7 +36,7 @@ if you prefer direct REST calls.
 
 ## What it covers
 
-The server exposes 35 owner-facing tools:
+The [generated tool inventory](docs/tools.md) and [JSON schemas](docs/tools.json) describe the current owner-facing tools:
 
 - Developer accounts: `integrations_hub_list_developer_accounts`, `integrations_hub_create_developer_account`, `integrations_hub_update_developer_account`, `integrations_hub_delete_developer_account`.
 - Applications/card: `integrations_hub_list_applications`, `integrations_hub_get_application`, `integrations_hub_get_catalog_metadata`, `integrations_hub_list_available_rights`, `integrations_hub_create_application`, `integrations_hub_update_application`.
@@ -48,15 +48,12 @@ The server exposes 35 owner-facing tools:
 - Lifecycle: `integrations_hub_validate_lifecycle_callback`.
 - Webhooks: `integrations_hub_get_location_webhooks`, `integrations_hub_change_location_webhooks` (location-wide entity hooks). Read and update the separate application lifecycle `callback_url` through the application tools.
 
-It also serves `feedback_submit`, on the same contract as Altegio Pro MCP: an agent reports a bug or a missing capability, and the server writes one masked `agent_feedback` line to its own log (no other sink; nothing in Altegio changes). A failed call with an Altegio 5xx or an unexpected error ends with one sentence pointing at it; validation, auth, other 4xx, timeouts and network failures do not. Reports are limited to 5 per 10 minutes per user (else per session); a refusal carries `error_class: "rate_limited"`. In production the line reaches Cloud Logging through the container's gcplogs driver, as a string:
-
-```bash
-gcloud logging read 'logName="projects/altegio-mcp/logs/gcplogs-docker-driver" AND jsonPayload.container.metadata.service="altegio-integrations-hub-mcp" AND jsonPayload.message:"\"event\":\"agent_feedback\""' --project=altegio-mcp --freshness=7d
-```
+It also serves `feedback_submit`, on the same contract as Altegio Pro MCP: an agent reports a bug or a missing capability, and the server writes one masked `agent_feedback` line to its own log (no other sink; nothing in Altegio changes). A failed call with an Altegio 5xx or an unexpected error ends with one sentence pointing at it; validation, auth, other 4xx, timeouts and network failures do not. Reports are limited to 5 per 10 minutes per user (else per session); a refusal carries `error_class: "rate_limited"`. Operators can inspect these masked feedback events in their deployment’s server logs.
 
 MCP resources:
 
 - `altegio://integrations-hub/internals` — the complete source-referenced Biz.ERP implementation guide;
+- `altegio://integrations-hub/embedded-surfaces` — embedded UI contracts and viewer identity;
 - `altegio://integrations-hub/safe-e2e` — draft → configure → install → activate → verify → update → uninstall;
 - `altegio://integrations-hub/tool-boundaries` — public/internal classifications and safety rules.
 - `altegio://integrations-hub/webhooks` — entity and lifecycle event contracts, safe settings changes, and delivery limits.
@@ -65,7 +62,7 @@ Prompt: `integrations_hub_safe_draft_rollout`.
 
 ## Safety model
 
-Every mutation requires `mode: plan | apply`. Plan mode sends no write request. Destructive and production-sensitive operations require an exact confirmation phrase. Payment records have a durable local idempotency store; application creation uses slug as a natural idempotency key; activation status-checks before callback.
+Every mutation requires `mode: plan | apply`. Plan mode sends no write request. Destructive and production-sensitive operations require an exact confirmation phrase. Payments and refunds use durable reservations before writing; ambiguous outcomes require reconciliation before retrying (see [RELEASING.md](RELEASING.md)). Payment records have a durable local idempotency store; application creation uses slug as a natural idempotency key; activation status-checks before callback.
 
 Partner operations are not authorized merely because a caller reached the public MCP endpoint. The server first checks that the caller's Altegio user can see the requested application in the stated developer account, then uses that account's `partner_system.token`. Transport authentication headers are never accepted as tool arguments. The optional `account.partner_token` on account creation only binds an existing partner system; `payload.partner_token` is accepted only by the callback-validation helper. Both are treated as secrets. Tokens, API keys, passwords, authorization headers, and secret keys are recursively redacted from tool results; secret-bearing settings are forwarded without logging.
 
@@ -94,22 +91,30 @@ The MCP does not generate logos, covers, screenshots, or videos. Generate or pre
 
 ## Run locally
 
-Node 22.23.2 is pinned.
+Use Node.js 26.13.0 and npm 12.2.2. Node.js 24.22.2 is also supported. The package has not been published to npm; run from a source checkout or build an installable tarball with `npm pack`.
 
 ```bash
-npm ci
+npx --yes npm@12.2.2 ci --ignore-scripts
 cp .env.example .env
-npm run dev:http
+# Set ALTEGIO_PARTNER_TOKEN in .env.
+npm run build
+npm run start:http
 ```
 
-Health: `GET http://localhost:8094/health`. MCP Streamable HTTP: `/mcp`. Stdio: `npm run dev`.
+Health: `GET http://localhost:8094/health`. MCP Streamable HTTP: `/mcp`. For local stdio, set `ALTEGIO_USER_TOKEN` and run `node dist/index.js`. HTTP requires the authenticated caller token on each request and never uses the stdio token. Keep the HTTP backend behind your trusted authentication proxy; see [SECURITY.md](SECURITY.md).
+
+Local HTTP binds to `127.0.0.1`; `MCP_HTTP_HOST` controls the bind address. `MCP_HTTP_ALLOWED_HOSTS` accepts comma-separated hostnames (default `localhost,mcp.alteg.io`); IP literals are accepted for private backend routing. `MCP_HTTP_ALLOWED_ORIGINS` is an exact comma-separated origin allowlist (default `https://mcp.alteg.io,https://claude.ai,https://chatgpt.com`). Requests without Origin are allowed; unlisted origins and hostnames are rejected before session creation. These checks do not authenticate a proxy.
+
+The SDK v2 migration preserves the existing 2025-era protocol handshake; it does not enable the 2026 protocol. A credential-free [library example](examples/server.mjs) runs with `node examples/server.mjs` after building.
 
 ## Verification
 
 ```bash
 npm run check
 docker build -t altegio-integrations-hub-mcp .
-docker run --rm -p 8094:8094 -e ALTEGIO_PARTNER_TOKEN=test altegio-integrations-hub-mcp
+docker run --rm --read-only --tmpfs /tmp --cap-drop=ALL --security-opt=no-new-privileges \
+  -p 127.0.0.1:8094:8094 -v integrations-hub-state:/data \
+  -e ALTEGIO_PARTNER_TOKEN=synthetic-smoke altegio-integrations-hub-mcp
 ```
 
 Tests cover schemas/safety, agent feedback (schema, masking, rate limit, event shape, nudge), request-scoped authentication, upstream error normalization, the owner-only tool inventory, plan no-op behavior, application idempotency, normalized install payloads, Streamable HTTP initialization, and the SIGTERM shutdown (stop line, bounded drain).
@@ -140,3 +145,7 @@ In-flight POST responses remain protected; an idle SSE stream alone does not
 keep a session alive. Expired IDs return 404 for client reinitialization, and
 new initialization at capacity returns 503 with `Retry-After: 60`. Shutdown
 closes the remaining transports after draining active requests.
+
+## Contributing and maintenance
+
+The [maintenance record](docs/maintenance.md) documents the dependency choices and verification limits. See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [the code of conduct](CODE_OF_CONDUCT.md), [CHANGELOG.md](CHANGELOG.md), and [RELEASING.md](RELEASING.md). Distributed under the [MIT license](LICENSE).

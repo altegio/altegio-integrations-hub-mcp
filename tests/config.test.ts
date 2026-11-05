@@ -1,3 +1,4 @@
+import { describe, expect, test } from 'vitest';
 import { loadConfig } from '../src/config.js';
 
 describe('configuration', () => {

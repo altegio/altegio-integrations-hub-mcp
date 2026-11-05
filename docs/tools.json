@@ -1,0 +1,2108 @@
+[
+  {
+    "name": "feedback_submit",
+    "description": "Report a bug or a missing capability of this server or the Altegio API to the team that runs it. bug: a tool failed or answered wrongly; feature_request: no tool does what the task needs. One report per problem; refer to records by id, never personal data (names, phones, emails, tokens). Not for the user's own complaints. Do not ask the user first; mention the report in one line.",
+    "readOnly": true,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "kind": { "type": "string", "enum": ["bug", "feature_request"] },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "One line, e.g. \"list_installations ignores status\"."
+        },
+        "goal": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "description": "What the user wanted and what you tried."
+        },
+        "tool": {
+          "description": "The tool involved, or the one you expected to exist.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        },
+        "operation_id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]{0,127}$" },
+        "location_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        },
+        "observed": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "expected": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "error_text": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "impact": {
+          "description": "blocked: task not done; workaround: done another way.",
+          "type": "string",
+          "enum": ["blocked", "workaround", "minor"]
+        },
+        "model": {
+          "description": "The model you run as, if you know it.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        }
+      },
+      "required": ["kind", "summary", "goal"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "const": "recorded" },
+        "report_id": { "type": "string", "pattern": "^fb_[0-9a-f]{12}$" },
+        "kind": { "type": "string", "enum": ["bug", "feature_request"] },
+        "masked_values": {
+          "description": "Values masked as contact details or secrets",
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "error": { "description": "Why the report was not recorded", "type": "string" },
+        "error_class": {
+          "description": "rate_limited when the caller sent too many",
+          "type": "string"
+        }
+      },
+      "additionalProperties": {},
+      "description": "Feedback receipt"
+    }
+  },
+  {
+    "name": "integrations_hub_activate_installation",
+    "description": "Plan or perform step 2: activate a pending installation and configure entity webhooks/chat/tips/channels. Active state is treated idempotently.",
+    "readOnly": false,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "location_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "webhook_urls": {
+              "default": [],
+              "description": "Entity webhook receiver URLs installed for the location",
+              "maxItems": 10,
+              "type": "array",
+              "items": { "type": "string", "format": "uri", "description": "Absolute HTTPS URL" }
+            },
+            "chat_url": {
+              "description": "Optional journal sidebar chat-frame base URL. It is applied while the installation is still pending; an already-active installation rejects a repeat callback, so use install_sidebar_frame for it instead",
+              "type": "string",
+              "format": "uri"
+            },
+            "tips_url": {
+              "description": "Optional tips integration URL",
+              "type": "string",
+              "format": "uri"
+            },
+            "channels": {
+              "default": [],
+              "description": "Notification channels enabled during activation",
+              "type": "array",
+              "items": { "type": "string", "enum": ["sms", "whatsapp"] }
+            },
+            "api_key": {
+              "description": "Optional application API key; secret",
+              "type": "string",
+              "minLength": 1
+            },
+            "login": {
+              "description": "Optional application login; secret",
+              "type": "string",
+              "minLength": 1
+            },
+            "secret_key": {
+              "description": "Optional application secret key; secret",
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["webhook_urls", "channels"],
+          "additionalProperties": false
+        },
+        "confirmation": { "type": "string" }
+      },
+      "required": ["mode", "partner_id", "application_id", "location_id", "settings"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_change_location_webhooks",
+    "description": "Plan or change the location-wide entity hook list and shared event selection. POST replaces the whole list and applies one selection to every URL. Review per-URL flags before applying; apply requires the plan snapshot and exact confirmation.",
+    "readOnly": false,
+    "destructive": true,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "location_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        },
+        "change": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": ["add_destination", "replace_destination", "remove_destination", "set_events"]
+            },
+            "url": {
+              "description": "Destination to add, replace, or remove; new URLs must use HTTPS",
+              "type": "string",
+              "maxLength": 4096,
+              "format": "uri"
+            },
+            "replacement_url": {
+              "description": "New destination for replace_destination",
+              "type": "string",
+              "maxLength": 4096,
+              "format": "uri"
+            },
+            "active": {
+              "description": "Enable or disable all location event hooks",
+              "type": "boolean"
+            },
+            "events": {
+              "description": "Partial event selection; other visible flags are kept",
+              "type": "object",
+              "properties": {
+                "location": { "type": "boolean" },
+                "team_member": { "type": "boolean" },
+                "product": { "type": "boolean" },
+                "service": { "type": "boolean" },
+                "service_category": { "type": "boolean" },
+                "client": { "type": "boolean" },
+                "appointment": { "type": "boolean" },
+                "schedule": { "type": "boolean" },
+                "loyalty_card": { "type": "boolean" },
+                "goods_sale": { "type": "boolean" },
+                "goods_receipt": { "type": "boolean" },
+                "goods_consumption": { "type": "boolean" },
+                "goods_theft": { "type": "boolean" },
+                "goods_move": { "type": "boolean" },
+                "finance_operation": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            },
+            "product": {
+              "description": "Product flag override when reading an older backend that omits good",
+              "type": "boolean"
+            },
+            "self_sending": {
+              "description": "Self-sending override when reading an older backend that omits it",
+              "type": "boolean"
+            },
+            "overwrite_shared_settings": {
+              "default": false,
+              "description": "Acknowledge that upstream applies one event selection to all existing URLs",
+              "type": "boolean"
+            }
+          },
+          "required": ["action", "overwrite_shared_settings"],
+          "additionalProperties": false
+        },
+        "expected_snapshot": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "confirmation": { "type": "string" }
+      },
+      "required": ["mode", "partner_id", "application_id", "location_id", "change"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_create_application",
+    "description": "Plan or create a draft Marketplace application. Creation is naturally idempotent by slug within the developer account.",
+    "readOnly": false,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        },
+        "application": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 3,
+              "description": "Marketplace application title"
+            },
+            "short_description": {
+              "type": "string",
+              "minLength": 3,
+              "description": "Short catalogue-card description"
+            },
+            "icon": {
+              "description": "New icon as a data:image/...;base64 data URL. Biz.ERP uploads it to Marketplace storage. Omit this field to keep the current icon; the hosted icon URL returned by reads is rejected because Biz.ERP would store its decoded bytes as a corrupt image.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^data:image\\/[-+.\\w]+;(?:name=[^;]+;)?base64,[A-Za-z0-9+/]+={0,2}$",
+                  "description": "Base64 image data URL"
+                },
+                { "type": "null" }
+              ]
+            },
+            "category_id": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Marketplace category ID"
+            },
+            "country_ids": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991,
+                "description": "Positive integer identifier"
+              },
+              "description": "Country IDs where the app is available"
+            },
+            "website_url": {
+              "anyOf": [
+                { "type": "string", "format": "uri", "description": "Absolute HTTPS URL" },
+                { "type": "string", "const": "" }
+              ],
+              "description": "Application website HTTPS URL, or an empty string"
+            },
+            "price": { "type": "string", "description": "Human-readable catalogue price" },
+            "trial_duration": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Free trial duration in days"
+            },
+            "channels": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991,
+                "description": "Positive integer identifier"
+              },
+              "description": "Marketplace channel dictionary IDs"
+            },
+            "permissions": {
+              "type": "object",
+              "propertyNames": { "type": "string", "minLength": 1 },
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "description": "Complete permission map keyed by current permission slug; includes flags, IDs, and numeric day limits such as -1 for unlimited history"
+            },
+            "callback_url": {
+              "default": "",
+              "description": "Backend URL for uninstall, freeze, and payment lifecycle callbacks",
+              "anyOf": [
+                { "type": "string", "format": "uri", "description": "Absolute HTTPS URL" },
+                { "type": "string", "const": "" }
+              ]
+            },
+            "registration_redirect_url": {
+              "default": "",
+              "description": "Application setup/settings URL opened after installation",
+              "anyOf": [
+                { "type": "string", "format": "uri", "description": "Absolute HTTPS URL" },
+                { "type": "string", "const": "" }
+              ]
+            },
+            "is_personal_data_access_needed": {
+              "default": false,
+              "description": "Whether the settings URL receives encrypted user_data parameters",
+              "type": "boolean"
+            },
+            "is_multiple_salons_allowed": {
+              "default": false,
+              "description": "Whether one setup can cover multiple locations",
+              "type": "boolean"
+            },
+            "is_iframe": {
+              "default": false,
+              "description": "Embed registration_redirect_url inside Altegio instead of opening a new tab",
+              "type": "boolean"
+            },
+            "slug": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 200,
+              "pattern": "^[A-Za-z0-9_]+$",
+              "description": "Stable application identifier; existing Integrations Hub slugs may contain underscores"
+            },
+            "is_nonpublic": {
+              "default": false,
+              "description": "Keep the application private/non-public",
+              "type": "boolean"
+            },
+            "nonpublic_webhook_url": {
+              "description": "Optional webhook URL for a non-public application",
+              "anyOf": [
+                { "type": "string", "format": "uri", "description": "Absolute HTTPS URL" },
+                { "type": "null" }
+              ]
+            },
+            "monetization_type": {
+              "type": "string",
+              "enum": ["free", "paid", "freemium"],
+              "description": "Application monetization model"
+            }
+          },
+          "required": [
+            "title",
+            "short_description",
+            "category_id",
+            "country_ids",
+            "website_url",
+            "price",
+            "trial_duration",
+            "channels",
+            "permissions",
+            "callback_url",
+            "registration_redirect_url",
+            "is_personal_data_access_needed",
+            "is_multiple_salons_allowed",
+            "is_iframe",
+            "slug",
+            "is_nonpublic",
+            "monetization_type"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": ["mode", "partner_id", "application"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_create_developer_account",
+    "description": "Plan or create a developer account. Any partner token returned upstream is redacted from the tool response.",
+    "readOnly": false,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "account": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Developer account display title"
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Developer or company description"
+            },
+            "name": { "type": "string", "minLength": 1, "description": "Maintainer contact name" },
+            "phone": {
+              "type": "string",
+              "minLength": 5,
+              "description": "Maintainer contact phone number"
+            },
+            "email": {
+              "type": "string",
+              "format": "email",
+              "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+              "description": "Maintainer contact email"
+            },
+            "website_url": {
+              "type": "string",
+              "format": "uri",
+              "description": "Developer or company website URL"
+            },
+            "legal_type": {
+              "default": "llc",
+              "description": "Legal entity type expected by Developer Cabinet",
+              "type": "string",
+              "enum": ["llc", "cjsc", "jsc", "ie", "np", "le"]
+            },
+            "partner_token": {
+              "description": "Existing partner token to bind; treated as a secret and redacted",
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "title",
+            "description",
+            "name",
+            "phone",
+            "email",
+            "website_url",
+            "legal_type"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": ["mode", "account"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_delete_developer_account",
+    "description": "Delete a developer account. This is destructive and may orphan its management workflow.",
+    "readOnly": false,
+    "destructive": true,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        },
+        "confirmation": { "type": "string" }
+      },
+      "required": ["mode", "partner_id"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_get_application",
+    "description": "Get one owned application by filtering the authoritative developer-account application list.",
+    "readOnly": true,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        }
+      },
+      "required": ["partner_id", "application_id"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_get_catalog_metadata",
+    "description": "Get current Marketplace categories, channels, functionalities, and the general country dictionary used by application/account country IDs.",
+    "readOnly": true,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_get_conversion_statistics",
+    "description": "Get application and category-average Marketplace funnel conversion series.",
+    "readOnly": true,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "conversion": {
+          "type": "string",
+          "enum": ["open_pending", "show_open", "active_payed", "pending_active", "pending_payed"]
+        },
+        "granularity": { "default": "day", "type": "string", "enum": ["day", "week", "month"] },
+        "date_from": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Calendar date in YYYY-MM-DD format"
+        },
+        "date_to": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Calendar date in YYYY-MM-DD format"
+        }
+      },
+      "required": [
+        "partner_id",
+        "application_id",
+        "conversion",
+        "granularity",
+        "date_from",
+        "date_to"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_get_installation_status",
+    "description": "Get status, payments, and status-transition log for an owned application at one location.",
+    "readOnly": true,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "location_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        }
+      },
+      "required": ["partner_id", "application_id", "location_id"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_get_location_webhooks",
+    "description": "Read location-wide entity webhook destinations and per-URL event flags for a location accessible to the caller. The application ID checks developer ownership; the location API enforces user permissions. This reports configuration, not delivery status.",
+    "readOnly": true,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "location_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        }
+      },
+      "required": ["partner_id", "application_id", "location_id"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_get_payment_link",
+    "description": "Generate an Altegio-hosted Marketplace payment link for an installed location.",
+    "readOnly": true,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "location_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        },
+        "tariff_option_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        },
+        "discount": { "default": 0, "type": "number", "minimum": 0, "maximum": 100 }
+      },
+      "required": ["partner_id", "application_id", "location_id", "tariff_option_id", "discount"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_get_statistics",
+    "description": "Get owned-application views, pending grants, activations, new payments, and uninstalls for a date range.",
+    "readOnly": true,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "date_from": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Calendar date in YYYY-MM-DD format"
+        },
+        "date_to": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Calendar date in YYYY-MM-DD format"
+        }
+      },
+      "required": ["partner_id", "application_id", "date_from", "date_to"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_grant_location_access",
+    "description": "Plan or perform step 1 of installation: location owner grants access, producing pending (or immediate active for eligible draft/private apps). Apply requires exact confirmation.",
+    "readOnly": false,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "location_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        },
+        "confirmation": { "type": "string" }
+      },
+      "required": ["mode", "partner_id", "application_id", "location_id"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_install_sidebar_frame",
+    "description": "Install or remove an internal chat/waiting_list/task_tracker sidebar frame. These types are distinct from developer employee/client/visit frames. This is also the way to set a chat frame on an installation that is already active, where a repeat activation callback is rejected.",
+    "readOnly": false,
+    "destructive": true,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "location_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Installed Altegio location ID"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["chat", "waiting_list", "task_tracker"],
+          "description": "Internal sidebar slot; not an employee/client/visit entity frame"
+        },
+        "url": {
+          "anyOf": [
+            { "type": "string", "format": "uri", "description": "Absolute HTTPS URL" },
+            { "type": "null" }
+          ],
+          "description": "HTTPS frame URL to install, or null to remove this application frame"
+        },
+        "confirmation": {
+          "description": "Exact phrase shown by plan mode and required by apply mode",
+          "type": "string"
+        }
+      },
+      "required": ["mode", "partner_id", "application_id", "location_id", "type", "url"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "ok": { "type": "boolean", "const": true },
+        "applied": {
+          "description": "False for a plan; true after a successful write",
+          "type": "boolean"
+        },
+        "plan": { "description": "Normalized upstream request returned in plan mode" },
+        "operation": { "type": "string" },
+        "data": { "description": "Raw upstream write response" },
+        "verification": { "description": "Explicit post-write verification evidence" },
+        "error": { "description": "Safe error message when the tool fails", "type": "string" },
+        "status": {
+          "description": "Optional upstream HTTP status on failure",
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "details": { "description": "Bounded upstream error details" }
+      },
+      "additionalProperties": {},
+      "description": "Plan/apply mutation result"
+    }
+  },
+  {
+    "name": "integrations_hub_list_applications",
+    "description": "List applications in a developer account, including card configuration, permissions, system-user ID, short links, and moderation state. Secret fields are redacted.",
+    "readOnly": true,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        }
+      },
+      "required": ["partner_id"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_list_available_rights",
+    "description": "Return the current hierarchical permission dictionary available to Marketplace system users.",
+    "readOnly": true,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        }
+      },
+      "required": ["partner_id"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_list_developer_accounts",
+    "description": "List developer accounts owned by the current Altegio user. Secret fields in partner-system metadata are redacted.",
+    "readOnly": true,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_list_entity_frames",
+    "description": "List declared employee/client/visit iframe definitions. Declarations are copied to a location only during a later application installation.",
+    "readOnly": true,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        }
+      },
+      "required": ["partner_id", "application_id"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": { "description": "Upstream request success flag", "type": "boolean" },
+        "data": {
+          "description": "Current declared entity iframe definitions",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 100,
+                "description": "Tab title shown inside the entity card"
+              },
+              "url": {
+                "type": "string",
+                "format": "uri",
+                "description": "HTTPS iframe URL. Redirects must preserve this URL origin or postMessage will fail."
+              },
+              "slug": {
+                "type": "string",
+                "enum": ["employee", "client", "visit"],
+                "description": "Entity card where this iframe tab is shown"
+              }
+            },
+            "required": ["title", "url", "slug"],
+            "additionalProperties": false
+          }
+        },
+        "meta": { "description": "Optional upstream response metadata" },
+        "error": { "description": "Safe error message when the tool fails", "type": "string" },
+        "status": {
+          "description": "Optional upstream HTTP status on failure",
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "details": { "description": "Bounded upstream error details" }
+      },
+      "additionalProperties": {},
+      "description": "Developer Frames API response"
+    }
+  },
+  {
+    "name": "integrations_hub_list_installations",
+    "description": "List locations connected to an owned application, with bounded pagination.",
+    "readOnly": true,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "page": {
+          "default": 1,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "count": { "default": 100, "type": "integer", "minimum": 1, "maximum": 1000 }
+      },
+      "required": ["partner_id", "application_id", "page", "count"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_list_reviews",
+    "description": "List public reviews for a Marketplace application.",
+    "readOnly": true,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        },
+        "page": {
+          "default": 1,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": ["application_id", "page"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_list_tariffs",
+    "description": "List Marketplace billing tariffs and options for an owned application.",
+    "readOnly": true,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        }
+      },
+      "required": ["partner_id", "application_id"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_notify_chat_message",
+    "description": "Signal a new chat message so Biz.ERP highlights the chat frame and may create notifications/leads according to location settings.",
+    "readOnly": false,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "location_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        },
+        "phone_from": { "type": "string", "pattern": "^\\d+$" },
+        "message": { "type": "string", "maxLength": 4000 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 255 }
+      },
+      "required": [
+        "mode",
+        "partner_id",
+        "application_id",
+        "location_id",
+        "phone_from",
+        "message",
+        "name"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_record_payment",
+    "description": "Plan or record a successful external payment. This can unfreeze an installation. Requires a durable idempotency key and exact confirmation.",
+    "readOnly": false,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "location_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        },
+        "currency_iso": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 3,
+          "pattern": "^[A-Z]{3}$"
+        },
+        "payment_sum": { "type": "number", "minimum": 0 },
+        "payment_date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$",
+          "description": "Local date and time in YYYY-MM-DD HH:mm:ss format"
+        },
+        "period_from": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$",
+          "description": "Local date and time in YYYY-MM-DD HH:mm:ss format"
+        },
+        "period_to": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$",
+          "description": "Local date and time in YYYY-MM-DD HH:mm:ss format"
+        },
+        "idempotency_key": { "type": "string", "minLength": 8, "maxLength": 200 },
+        "confirmation": { "type": "string" }
+      },
+      "required": [
+        "mode",
+        "partner_id",
+        "application_id",
+        "location_id",
+        "currency_iso",
+        "payment_sum",
+        "payment_date",
+        "period_from",
+        "period_to",
+        "idempotency_key"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_refund_payment",
+    "description": "Plan or report a Marketplace payment refund. Requires an exact confirmation phrase.",
+    "readOnly": false,
+    "destructive": true,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "payment_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        },
+        "confirmation": { "type": "string" }
+      },
+      "required": ["mode", "partner_id", "application_id", "payment_id"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_replace_entity_frames",
+    "description": "Plan or replace the full employee/client/visit declaration set. Omitted slugs are deleted. Existing installations are not updated or backfilled.",
+    "readOnly": false,
+    "destructive": true,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "frames": {
+          "maxItems": 3,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 100,
+                "description": "Tab title shown inside the entity card"
+              },
+              "url": {
+                "type": "string",
+                "format": "uri",
+                "description": "HTTPS iframe URL. Redirects must preserve this URL origin or postMessage will fail."
+              },
+              "slug": {
+                "type": "string",
+                "enum": ["employee", "client", "visit"],
+                "description": "Entity card where this iframe tab is shown"
+              }
+            },
+            "required": ["title", "url", "slug"],
+            "additionalProperties": false
+          },
+          "description": "Complete replacement set of entity iframe declarations; omitted slugs are deleted"
+        },
+        "confirmation": {
+          "description": "Exact phrase shown by plan mode and required by apply mode",
+          "type": "string"
+        }
+      },
+      "required": ["mode", "partner_id", "application_id", "frames"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "ok": { "type": "boolean", "const": true },
+        "applied": {
+          "description": "False for a plan; true after a successful write",
+          "type": "boolean"
+        },
+        "plan": { "description": "Normalized upstream request returned in plan mode" },
+        "operation": { "type": "string" },
+        "data": { "description": "Raw upstream write response" },
+        "verification": { "description": "Explicit post-write verification evidence" },
+        "error": { "description": "Safe error message when the tool fails", "type": "string" },
+        "status": {
+          "description": "Optional upstream HTTP status on failure",
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "details": { "description": "Bounded upstream error details" }
+      },
+      "additionalProperties": {},
+      "description": "Plan/apply mutation result"
+    }
+  },
+  {
+    "name": "integrations_hub_save_moderation_instructions",
+    "description": "Plan or save connection and payment instructions before submitting an application for moderation.",
+    "readOnly": false,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "connect_instruction": { "type": "string", "maxLength": 1000 },
+        "payment_instruction": { "type": "string", "maxLength": 1000 }
+      },
+      "required": [
+        "mode",
+        "partner_id",
+        "application_id",
+        "connect_instruction",
+        "payment_instruction"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_set_discount",
+    "description": "Plan or set the Marketplace payment discount for selected locations.",
+    "readOnly": false,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "location_ids": {
+          "minItems": 1,
+          "maxItems": 1000,
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Positive integer identifier"
+          }
+        },
+        "discount": { "type": "number", "minimum": 0, "maximum": 100 },
+        "confirmation": { "type": "string" }
+      },
+      "required": ["mode", "partner_id", "application_id", "location_ids", "discount"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_set_sms_sender_names",
+    "description": "Plan or publish 1-20 SMS sender names for a compatible installed application.",
+    "readOnly": false,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "location_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        },
+        "short_names": {
+          "minItems": 1,
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!.*altegio)(?!ag$)[^А-Яа-я]+$"
+          }
+        }
+      },
+      "required": ["mode", "partner_id", "application_id", "location_id", "short_names"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_submit_for_moderation",
+    "description": "Plan or submit a fully configured application for Marketplace moderation.",
+    "readOnly": false,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "confirmation": { "type": "string" }
+      },
+      "required": ["mode", "partner_id", "application_id"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_toggle_sidebar_highlight",
+    "description": "Enable or clear the highlight on an already installed sidebar frame, optionally for one user.",
+    "readOnly": false,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "location_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Installed Altegio location ID"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["chat", "waiting_list", "task_tracker"],
+          "description": "Installed internal sidebar slot to update"
+        },
+        "user_id": {
+          "description": "Limit the highlight to one user, or null for the location-wide state",
+          "anyOf": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Positive integer identifier"
+            },
+            { "type": "null" }
+          ]
+        },
+        "is_enabled": {
+          "type": "boolean",
+          "description": "Whether the frame should be highlighted"
+        }
+      },
+      "required": ["mode", "partner_id", "application_id", "location_id", "type", "is_enabled"],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "ok": { "type": "boolean", "const": true },
+        "applied": {
+          "description": "False for a plan; true after a successful write",
+          "type": "boolean"
+        },
+        "plan": { "description": "Normalized upstream request returned in plan mode" },
+        "operation": { "type": "string" },
+        "data": { "description": "Raw upstream write response" },
+        "verification": { "description": "Explicit post-write verification evidence" },
+        "error": { "description": "Safe error message when the tool fails", "type": "string" },
+        "status": {
+          "description": "Optional upstream HTTP status on failure",
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "details": { "description": "Bounded upstream error details" }
+      },
+      "additionalProperties": {},
+      "description": "Plan/apply mutation result"
+    }
+  },
+  {
+    "name": "integrations_hub_uninstall",
+    "description": "Plan or uninstall an application from a location. Requires an exact confirmation phrase.",
+    "readOnly": false,
+    "destructive": true,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "location_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        },
+        "confirmation": { "type": "string" }
+      },
+      "required": ["mode", "partner_id", "application_id", "location_id"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_update_application",
+    "description": "Plan or replace the complete Marketplace card and technical settings. Apply requires exact confirmation because omitted collections are cleared.",
+    "readOnly": false,
+    "destructive": true,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "application": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 3,
+              "description": "Marketplace application title"
+            },
+            "short_description": {
+              "type": "string",
+              "minLength": 3,
+              "description": "Short catalogue-card description"
+            },
+            "icon": {
+              "description": "New icon as a data:image/...;base64 data URL. Biz.ERP uploads it to Marketplace storage. Omit this field to keep the current icon; the hosted icon URL returned by reads is rejected because Biz.ERP would store its decoded bytes as a corrupt image.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^data:image\\/[-+.\\w]+;(?:name=[^;]+;)?base64,[A-Za-z0-9+/]+={0,2}$",
+                  "description": "Base64 image data URL"
+                },
+                { "type": "null" }
+              ]
+            },
+            "category_id": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Marketplace category ID"
+            },
+            "country_ids": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991,
+                "description": "Positive integer identifier"
+              },
+              "description": "Country IDs where the app is available"
+            },
+            "website_url": {
+              "anyOf": [
+                { "type": "string", "format": "uri", "description": "Absolute HTTPS URL" },
+                { "type": "string", "const": "" }
+              ],
+              "description": "Application website HTTPS URL, or an empty string"
+            },
+            "price": { "type": "string", "description": "Human-readable catalogue price" },
+            "trial_duration": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Free trial duration in days"
+            },
+            "channels": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991,
+                "description": "Positive integer identifier"
+              },
+              "description": "Marketplace channel dictionary IDs"
+            },
+            "permissions": {
+              "type": "object",
+              "propertyNames": { "type": "string", "minLength": 1 },
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "description": "Complete permission map keyed by current permission slug; includes flags, IDs, and numeric day limits such as -1 for unlimited history"
+            },
+            "callback_url": {
+              "default": "",
+              "description": "Backend URL for uninstall, freeze, and payment lifecycle callbacks",
+              "anyOf": [
+                { "type": "string", "format": "uri", "description": "Absolute HTTPS URL" },
+                { "type": "string", "const": "" }
+              ]
+            },
+            "registration_redirect_url": {
+              "default": "",
+              "description": "Application setup/settings URL opened after installation",
+              "anyOf": [
+                { "type": "string", "format": "uri", "description": "Absolute HTTPS URL" },
+                { "type": "string", "const": "" }
+              ]
+            },
+            "is_personal_data_access_needed": {
+              "default": false,
+              "description": "Whether the settings URL receives encrypted user_data parameters",
+              "type": "boolean"
+            },
+            "is_multiple_salons_allowed": {
+              "default": false,
+              "description": "Whether one setup can cover multiple locations",
+              "type": "boolean"
+            },
+            "is_iframe": {
+              "default": false,
+              "description": "Embed registration_redirect_url inside Altegio instead of opening a new tab",
+              "type": "boolean"
+            },
+            "slug": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 200,
+              "pattern": "^[A-Za-z0-9_]+$",
+              "description": "Stable application identifier; existing Integrations Hub slugs may contain underscores"
+            },
+            "is_nonpublic": {
+              "default": false,
+              "description": "Keep the application private/non-public",
+              "type": "boolean"
+            },
+            "nonpublic_webhook_url": {
+              "description": "Optional webhook URL for a non-public application",
+              "anyOf": [
+                { "type": "string", "format": "uri", "description": "Absolute HTTPS URL" },
+                { "type": "null" }
+              ]
+            },
+            "monetization_type": {
+              "type": "string",
+              "enum": ["free", "paid", "freemium"],
+              "description": "Application monetization model"
+            },
+            "full_description": {
+              "default": "",
+              "description": "Full catalogue description",
+              "type": "string"
+            },
+            "features_description": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Feature description paragraphs"
+            },
+            "promo_materials": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": { "type": "string", "enum": ["image", "video"] },
+                  "content": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "For image, a data:image/...;base64 data URL uploads a new asset and an existing Marketplace image URL/path is preserved. For video, provide the video reference or URL; Biz.ERP does not upload video bytes here."
+                  }
+                },
+                "required": ["type", "content"],
+                "additionalProperties": false
+              }
+            },
+            "questions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "question": { "type": "string", "minLength": 3, "maxLength": 100 },
+                  "answer": { "type": "string", "minLength": 3, "maxLength": 1000 }
+                },
+                "required": ["question", "answer"],
+                "additionalProperties": false
+              }
+            },
+            "functionalities": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "chat",
+                  "mass_sendings",
+                  "service_sendings",
+                  "cascades",
+                  "approving",
+                  "returns",
+                  "rfm",
+                  "maps_reviews",
+                  "interceptor",
+                  "analytics",
+                  "tasks"
+                ]
+              },
+              "description": "Validated Marketplace functionality slugs"
+            }
+          },
+          "required": [
+            "title",
+            "short_description",
+            "category_id",
+            "country_ids",
+            "website_url",
+            "price",
+            "trial_duration",
+            "channels",
+            "permissions",
+            "callback_url",
+            "registration_redirect_url",
+            "is_personal_data_access_needed",
+            "is_multiple_salons_allowed",
+            "is_iframe",
+            "slug",
+            "is_nonpublic",
+            "monetization_type",
+            "full_description",
+            "features_description",
+            "promo_materials",
+            "questions",
+            "functionalities"
+          ],
+          "additionalProperties": false
+        },
+        "confirmation": {
+          "description": "Exact phrase shown by plan mode and required by apply mode",
+          "type": "string"
+        }
+      },
+      "required": ["mode", "partner_id", "application_id", "application"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_update_developer_account",
+    "description": "Plan or replace developer-account details. Send the complete current account payload.",
+    "readOnly": false,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        },
+        "account": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Developer account display title"
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Developer or company description"
+            },
+            "name": { "type": "string", "minLength": 1, "description": "Maintainer contact name" },
+            "phone": {
+              "type": "string",
+              "minLength": 5,
+              "description": "Maintainer contact phone number"
+            },
+            "email": {
+              "type": "string",
+              "format": "email",
+              "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+              "description": "Maintainer contact email"
+            },
+            "website_url": {
+              "type": "string",
+              "format": "uri",
+              "description": "Developer or company website URL"
+            },
+            "legal_type": {
+              "default": "llc",
+              "description": "Legal entity type expected by Developer Cabinet",
+              "type": "string",
+              "enum": ["llc", "cjsc", "jsc", "ie", "np", "le"]
+            },
+            "country_id": {
+              "description": "Country dictionary ID",
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "company_name": {
+              "description": "Registered company name",
+              "type": "string",
+              "minLength": 1
+            },
+            "reg_number": {
+              "description": "Company registration number",
+              "type": "string",
+              "minLength": 1
+            },
+            "privacy_policy_url": {
+              "description": "Public privacy policy URL",
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "required": [
+            "title",
+            "description",
+            "name",
+            "phone",
+            "email",
+            "website_url",
+            "legal_type"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": ["mode", "partner_id", "account"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_update_notification_channel",
+    "description": "Plan or update SMS/WhatsApp channel availability for a compatible installed application.",
+    "readOnly": false,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["plan", "apply"],
+          "description": "Use plan to preview without writing; use apply to send the mutation"
+        },
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Developer account ID used for caller ownership checks"
+        },
+        "application_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Marketplace application ID owned by that account"
+        },
+        "location_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        },
+        "channel": { "type": "string", "enum": ["sms", "whatsapp"] },
+        "is_available": { "type": "boolean" }
+      },
+      "required": [
+        "mode",
+        "partner_id",
+        "application_id",
+        "location_id",
+        "channel",
+        "is_available"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "integrations_hub_validate_lifecycle_callback",
+    "description": "Validate and normalize an uninstall/freeze/payment callback payload against the owned developer-account token without revealing it.",
+    "readOnly": true,
+    "destructive": false,
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "partner_id": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Positive integer identifier"
+        },
+        "payload": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "salon_id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Positive integer identifier"
+                },
+                "application_id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Positive integer identifier"
+                },
+                "event": { "type": "string", "enum": ["uninstall", "freeze"] },
+                "partner_token": { "type": "string", "minLength": 1 }
+              },
+              "required": ["salon_id", "application_id", "event", "partner_token"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "salon_id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Positive integer identifier"
+                },
+                "application_id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Positive integer identifier"
+                },
+                "event": { "type": "string", "const": "payment" },
+                "partner_token": { "type": "string", "minLength": 1 },
+                "payment_id": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Positive integer identifier"
+                },
+                "amount": { "type": "number", "minimum": 0 },
+                "currency_iso": { "type": "string", "minLength": 3, "maxLength": 3 },
+                "discount": { "type": ["number", "null"] },
+                "period_from": {},
+                "period_to": {},
+                "payment_date": {},
+                "tariff_option_id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "Positive integer identifier"
+                    },
+                    { "type": "null" }
+                  ]
+                },
+                "sign": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+              },
+              "required": [
+                "salon_id",
+                "application_id",
+                "event",
+                "partner_token",
+                "payment_id",
+                "amount",
+                "currency_iso",
+                "discount",
+                "period_from",
+                "period_to",
+                "payment_date",
+                "tariff_option_id",
+                "sign"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["partner_id", "payload"],
+      "additionalProperties": false
+    }
+  }
+]

@@ -6,6 +6,9 @@ export const testConfig: Config = {
   ALTEGIO_API_BASE: 'https://api.example.test/api/v1',
   ALTEGIO_APP_BASE: 'https://app.example.test',
   PORT: 8094,
+  MCP_HTTP_HOST: '127.0.0.1',
+  MCP_HTTP_ALLOWED_HOSTS: 'localhost',
+  MCP_HTTP_ALLOWED_ORIGINS: 'https://client.example.test',
   MCP_HTTP_MAX_SESSIONS: 384,
   INTEGRATIONS_HUB_MCP_STATE_DIR: '/tmp/altegio-integrations-hub-mcp-test-state',
 };

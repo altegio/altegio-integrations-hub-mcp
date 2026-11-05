@@ -50,11 +50,17 @@ export class MarketplaceClient {
     if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey;
     if (options.body !== undefined) headers['Content-Type'] = 'application/json';
 
+    const callerSignal = requestContext()?.signal;
+    const signal = AbortSignal.any([
+      AbortSignal.timeout(30_000),
+      ...(callerSignal ? [callerSignal] : []),
+    ]);
+    signal.throwIfAborted();
     const response = await fetch(url, {
       method,
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: AbortSignal.timeout(30_000),
+      signal,
     });
     const text = await response.text();
     let parsed: unknown = null;

@@ -1,3 +1,4 @@
+import { describe, expect, test } from 'vitest';
 import { buildTools } from '../src/tools.js';
 import { installationSettings } from '../src/schemas.js';
 import {

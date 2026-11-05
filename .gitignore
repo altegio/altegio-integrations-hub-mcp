@@ -5,3 +5,6 @@ coverage/
 .DS_Store
 *.log
 .integrations-hub-mcp/
+.claude/worktrees/
+.audit/
+*.tgz

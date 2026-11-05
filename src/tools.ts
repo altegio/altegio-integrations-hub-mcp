@@ -188,6 +188,35 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
     });
   };
 
+  const financialWrite = async (
+    operation: string,
+    partnerId: number,
+    applicationId: number,
+    key: string,
+    path: string,
+    fingerprint: string,
+    body?: unknown
+  ): Promise<Record<string, unknown>> =>
+    idempotency.withLock(key, async () => {
+      // Cached financial results remain private application data.
+      await owned(partnerId, applicationId);
+      const partnerToken = await client.partnerTokenForAccount(partnerId);
+      const previous = await idempotency.get(key, fingerprint);
+      if (previous !== undefined)
+        return { ok: true, applied: false, idempotent: true, operation, data: previous };
+      await idempotency.reserve(key, fingerprint);
+      const result = await client.request(path, {
+        method: 'POST',
+        lane: 'partner',
+        host: 'app',
+        body,
+        partnerToken,
+        idempotencyKey: key,
+      });
+      await idempotency.put(key, fingerprint, result);
+      return bodyResult(operation, result);
+    });
+
   const partnerAndApp = {
     partner_id: positiveId.describe('Developer account ID used for caller ownership checks'),
     application_id: positiveId.describe('Marketplace application ID owned by that account'),
@@ -926,27 +955,15 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
           input.confirmation,
           `RECORD PAYMENT FOR APPLICATION ${input.application_id} AT LOCATION ${input.location_id}`
         );
-        const fingerprint = idempotency.fingerprint(body);
-        return idempotency.withLock(input.idempotency_key, async () => {
-          const previous = await idempotency.get(input.idempotency_key, fingerprint);
-          if (previous !== undefined)
-            return {
-              ok: true,
-              applied: false,
-              idempotent: true,
-              operation: 'record_payment',
-              data: previous,
-            };
-          const result = await partnerWrite(
-            input.partner_id,
-            input.application_id,
-            path,
-            body,
-            input.idempotency_key
-          );
-          await idempotency.put(input.idempotency_key, fingerprint, result);
-          return bodyResult('record_payment', result);
-        });
+        return financialWrite(
+          'record_payment',
+          input.partner_id,
+          input.application_id,
+          input.idempotency_key,
+          path,
+          idempotency.fingerprint(body),
+          body
+        );
       }
     ),
     tool(
@@ -966,7 +983,9 @@ export function buildTools(config: Config, client = new MarketplaceClient(config
         if (applyMode === 'plan')
           return pathPlan('refund_payment', 'POST', path, undefined, 'Financial action');
         requireConfirmation(confirmation, `REFUND MARKETPLACE PAYMENT ${payment_id}`);
-        return bodyResult('refund_payment', await partnerWrite(partner_id, application_id, path));
+        const key = `refund:${partner_id}:${application_id}:${payment_id}`;
+        const fingerprint = idempotency.fingerprint({ partner_id, application_id, payment_id });
+        return financialWrite('refund_payment', partner_id, application_id, key, path, fingerprint);
       }
     ),
     tool(

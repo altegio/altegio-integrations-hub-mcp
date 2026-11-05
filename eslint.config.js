@@ -1,19 +1,20 @@
+import { defineConfig } from 'eslint/config';
 import js from '@eslint/js';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-export default tseslint.config(
-  { ignores: ['dist/**', 'coverage/**'] },
+export default defineConfig(
+  { ignores: ['dist/**', 'coverage/**', '.claude/**', '.audit/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['scripts/**/*.mjs'],
+    files: ['scripts/**/*.mjs', 'examples/**/*.mjs'],
     languageOptions: { globals: globals.node },
   },
   {
     files: ['**/*.ts'],
     languageOptions: {
-      globals: { ...globals.node, ...globals.jest },
+      globals: { ...globals.node, ...globals.vitest },
     },
     rules: {
       '@typescript-eslint/explicit-function-return-type': 'error',

@@ -11,36 +11,72 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   check:
+    name: Check (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['24.22.2', '26.13.0']
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: .nvmrc
+          node-version: ${{ matrix.node }}
           cache: npm
-      - name: Check runtime version alignment
-        run: |
-          test "$(sort -u <(sed -nE 's/^FROM node:([0-9.]+)-.*/\1/p' Dockerfile))" = "$(cat .nvmrc)"
+      - run: npm install --global npm@12.2.2 --ignore-scripts
       - run: npm ci --ignore-scripts --registry=https://registry.npmjs.org
       - run: npm audit --registry=https://registry.npmjs.org
       - run: npm run check
-      - run: docker build --pull -t altegio-integrations-hub-mcp:ci .
+      - run: node examples/server.mjs
+
+  container:
+    name: Container
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Check runtime version alignment
+        run: |
+          test "$(sort -u <(sed -nE 's/^FROM node:([0-9.]+)-.*/\1/p' Dockerfile))" = "$(cat .nvmrc)"
+      - run: docker build --pull --build-arg VCS_REF="$GITHUB_SHA" -t altegio-integrations-hub-mcp:ci .
       - name: Scan the runtime image
         run: bash scripts/scan-image.sh altegio-integrations-hub-mcp:ci
       - name: Container smoke
         run: |
-          docker run -d --name integrations-hub-mcp --cap-drop=ALL --security-opt=no-new-privileges -p 8094:8094 -e ALTEGIO_PARTNER_TOKEN=test altegio-integrations-hub-mcp:ci
+          docker run -d --name integrations-hub-mcp --read-only --tmpfs /tmp --cap-drop=ALL --security-opt=no-new-privileges -p 127.0.0.1:8094:8094 -e ALTEGIO_PARTNER_TOKEN=synthetic-ci altegio-integrations-hub-mcp:ci
           healthy=
           for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8094/health && healthy=1 && break; sleep 1; done
-          docker exec integrations-hub-mcp sh -ec 'test "$(id -u)" = 1001; ! command -v npm; ! command -v yarn; test -w /data'
-          node scripts/smoke-http.mjs http://127.0.0.1:8094/mcp
-          # A deploy stops the container with SIGTERM; the restart alert reads the stop line.
-          docker stop integrations-hub-mcp
-          logs=$(docker logs integrations-hub-mcp 2>&1)
-          printf '%s\n' "$logs"
           test -n "$healthy"
-          grep -q 'Received SIGTERM, shutting down' <<< "$logs"
+          docker exec integrations-hub-mcp sh -ec 'test "$(id -u)" = 1001; ! command -v npm; ! command -v yarn; test -w /data'
+          test "$(docker inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' integrations-hub-mcp)" = "$GITHUB_SHA"
+          node scripts/smoke-http.mjs http://127.0.0.1:8094/mcp
+          docker stop integrations-hub-mcp
+          docker logs integrations-hub-mcp 2>&1 | grep -q 'Received SIGTERM, shutting down'
           test "$(docker inspect -f '{{.State.ExitCode}}' integrations-hub-mcp)" = 0
+      - name: Cleanup
+        if: always()
+        run: docker rm -fv integrations-hub-mcp 2>/dev/null || true
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Scan Git history
+        run: >-
+          docker run --rm -v "$PWD:/repo:ro" -w /repo
+          ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          git /repo --log-opts=--all --redact --no-banner

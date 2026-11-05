@@ -1,7 +1,7 @@
 import { once } from 'node:events';
 import type { Server } from 'node:http';
 import { connect, type AddressInfo, type Socket } from 'node:net';
-import { jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { createApp, shutdown } from '../src/http-server.js';
 import { testConfig } from './helpers.js';
 
@@ -53,12 +53,12 @@ describe('HTTP shutdown', () => {
     return socket;
   };
 
-  let stderr: ReturnType<typeof jest.spyOn>;
+  let stderr: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
-    stderr = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
   });
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
     // A regression must fail its test, not hold the run open until the CI timeout.
     for (const socket of sockets.splice(0)) socket.destroy();
     for (const server of servers.splice(0)) server.close().closeAllConnections();
