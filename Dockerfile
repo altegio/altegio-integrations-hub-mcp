@@ -18,7 +18,8 @@ RUN npm install --global npm@12.2.2 --ignore-scripts && npm ci --omit=dev --igno
     && rm -rf /usr/local/lib/node_modules/npm /opt/yarn-* \
     && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/yarn /usr/local/bin/yarnpkg /usr/local/bin/corepack
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
-COPY --chown=nodejs:nodejs docs ./docs
+COPY --chown=nodejs:nodejs docs/marketplace-internals.md docs/embedded-surfaces.md docs/safe-e2e.md docs/tool-boundaries.md docs/webhooks.md ./docs/
+COPY LICENSE ./LICENSE
 RUN mkdir /data && chown nodejs:nodejs /data
 USER nodejs
 ENV NODE_ENV=production PORT=8094 MCP_HTTP_HOST=0.0.0.0 INTEGRATIONS_HUB_MCP_STATE_DIR=/data
