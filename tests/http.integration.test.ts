@@ -114,9 +114,10 @@ describe('HTTP session status codes', () => {
     });
 
   const withApp = async (
-    run: (port: number, created: ReturnType<typeof createApp>) => Promise<void>
+    run: (port: number, created: ReturnType<typeof createApp>) => Promise<void>,
+    options?: Parameters<typeof createApp>[1]
   ): Promise<void> => {
-    const created = createApp({ ...testConfig, ALTEGIO_USER_TOKEN: 'user-token' });
+    const created = createApp({ ...testConfig, ALTEGIO_USER_TOKEN: 'user-token' }, options);
     const listener = created.app.listen(0, '127.0.0.1');
     await new Promise<void>((resolve) => listener.once('listening', resolve));
     try {
@@ -207,6 +208,36 @@ describe('HTTP session status codes', () => {
       expect(tools.status).toBe(200);
       expect(await tools.text()).toContain('integrations_hub_create_application');
     });
+  });
+
+  test('keeps a session alive while its GET stream is open and expires it after disconnect', async () => {
+    const idleTimeoutMs = 300;
+    await withApp(
+      async (port, { transports }) => {
+        const init = await send(port, 'POST', null, INITIALIZE);
+        expect(init.status).toBe(200);
+        const sessionId = init.headers.get('mcp-session-id')!;
+        await init.text();
+        const stream = await send(port, 'GET', sessionId);
+        try {
+          expect(stream.status).toBe(200);
+          expect(stream.headers.get('content-type')).toContain('text/event-stream');
+
+          await new Promise((resolve) => setTimeout(resolve, idleTimeoutMs + 100));
+          const tools = await send(port, 'POST', sessionId, TOOLS_LIST);
+          expect(await tools.text()).toContain('integrations_hub_list_developer_accounts');
+          expect(tools.status).toBe(200);
+        } finally {
+          await stream.body?.cancel();
+        }
+
+        await expect.poll(() => Object.keys(transports)).toHaveLength(0);
+        const stale = await send(port, 'GET', sessionId);
+        expect(stale.status).toBe(404);
+        expect(await stale.json()).toEqual(SESSION_NOT_FOUND);
+      },
+      { idleTimeoutMs }
+    );
   });
 });
 

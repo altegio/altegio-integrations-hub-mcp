@@ -31,12 +31,12 @@ describe('HTTP session memory budget', () => {
     expect(close).toHaveBeenCalledTimes(1);
   });
 
-  it('does not expire long-running or overlapping POST responses', async () => {
+  it('does not expire long-running or overlapping HTTP responses', async () => {
     const budget = new HttpSessionBudget(1, 100);
     const close = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     const lease = budget.acquire(close)!;
-    const first = lease.beginPost();
-    const second = lease.beginPost();
+    const first = lease.beginRequest();
+    const second = lease.beginRequest();
     await vi.advanceTimersByTimeAsync(1000);
     first();
     first(); // finish and close can both fire for one response
@@ -52,7 +52,7 @@ describe('HTTP session memory budget', () => {
     const budget = new HttpSessionBudget(1, 100);
     const close = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     const lease = budget.acquire(close)!;
-    const finish = lease.beginPost();
+    const finish = lease.beginRequest();
     lease.release();
     lease.release();
     finish();
