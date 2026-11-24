@@ -20,7 +20,7 @@ export class HttpSessionBudget {
 
 export class HttpSessionLease {
   private timer?: ReturnType<typeof setTimeout>;
-  private activePosts = 0;
+  private activeRequests = 0;
   private released = false;
 
   constructor(
@@ -31,7 +31,7 @@ export class HttpSessionLease {
 
   touch(): void {
     clearTimeout(this.timer);
-    if (this.released || this.activePosts > 0) return;
+    if (this.released || this.activeRequests > 0) return;
     this.timer = setTimeout(() => {
       // Release the slot before closing; onclose also releases idempotently.
       this.release();
@@ -40,15 +40,15 @@ export class HttpSessionLease {
     this.timer.unref();
   }
 
-  /** A POST response may outlive handleRequest; keep its tool call alive. */
-  beginPost(): () => void {
-    this.activePosts++;
+  /** Keep the session while a tool response or standalone SSE stream is open. */
+  beginRequest(): () => void {
+    this.activeRequests++;
     clearTimeout(this.timer);
     let finished = false;
     return () => {
       if (finished) return;
       finished = true;
-      this.activePosts--;
+      this.activeRequests--;
       this.touch();
     };
   }

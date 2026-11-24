@@ -24,6 +24,13 @@ function sessionTransport(
   return sessionId && Object.hasOwn(transports, sessionId) ? transports[sessionId] : undefined;
 }
 
+function retainForResponse(lease: HttpSessionLease | undefined, response: express.Response): void {
+  if (!lease) return;
+  const finish = lease.beginRequest();
+  response.once('finish', finish);
+  response.once('close', finish);
+}
+
 /**
  * Sessions live in process memory, so a restart or redeploy forgets them all. The Streamable
  * HTTP transport answers a session ID this process does not hold with 404, which tells the
@@ -96,16 +103,11 @@ export function createApp(
       return;
     }
     const lease = leases.get(transport);
-    const finish = lease?.beginPost();
-    if (finish) {
-      response.once('finish', finish);
-      response.once('close', finish);
-    }
+    retainForResponse(lease, response);
     try {
       // A local stdio credential must never become the fallback identity of an HTTP caller.
       if (initializing)
         await createServer({ ...config, ALTEGIO_USER_TOKEN: undefined }).connect(transport);
-      leases.get(transport)?.touch();
       await runWithContext(parseRequestContext(request.headers), () =>
         transport!.handleRequest(request, response, request.body)
       );
@@ -130,7 +132,7 @@ export function createApp(
         rejectSessionlessRequest(response, sessionId);
         return;
       }
-      leases.get(transport)?.touch();
+      retainForResponse(leases.get(transport), response);
       await runWithContext(parseRequestContext(request.headers), () =>
         transport.handleRequest(request, response)
       );
